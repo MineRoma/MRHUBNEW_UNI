@@ -75,11 +75,10 @@ local Button = Tab2:CreateButton({
 })
 
 -- =========================================================================
--- !!! SMART AUTO-FARM (НОВАЯ ЛОГИКА) !!!
+-- !!! SMART AUTO-FARM (ИСПРАВЛЕННАЯ ВЕРСИЯ С ДВУМЯ КНОПКАМИ) !!!
 -- =========================================================================
 
--- Цены на 10 кейсов, как вы указали:
--- (Trash 0, Beggar 2200, Plodder 4440, Office Clerk 6890, Manager 8350, Gold 19990)
+-- Цены на 10 кейсов (замените, если они изменятся)
 local CASE_PRICES = {
     ["Gold"] = 19990, 
     ["Manager"] = 8350,
@@ -95,84 +94,105 @@ local CASE_PRIORITY = {
 }
 
 local smartFarmActive = false
+local smartFarmThread = nil -- Переменная для хранения потока
 
-local ButtonSmart = TabSmart:CreateButton({
-   Name = "Запустить Smart Auto-Farm",
-   Callback = function(self)
-        smartFarmActive = not smartFarmActive -- Переключение состояния
+-- Функция получения денег
+local function getPlayerMoney()
+    local player = game.Players.LocalPlayer
+    local leaderstats = player:FindFirstChild("leaderstats")
+    local moneyValue
+    if leaderstats then
+        moneyValue = leaderstats:FindFirstChild("Money") -- предполагаем, что деньги называются "Money"
+    end
+    return moneyValue and moneyValue.Value or 0
+end
 
-        if smartFarmActive then
-            self:Set({Name = "Остановить Smart Auto-Farm"})
+-- Функция основного цикла фарма (запускается в spawn)
+local function runSmartFarm()
+    while smartFarmActive do
+        local currentMoney = getPlayerMoney()
+        local caseFound = false
+        
+        -- Перебор кейсов от самого дорогого к самому дешевому
+        for _, caseName in ipairs(CASE_PRIORITY) do
+            local cost = CASE_PRICES[caseName]
             
-            while smartFarmActive do
-                local player = game.Players.LocalPlayer
+            if currentMoney >= cost then
+                -- 1. Открытие 10 кейсов
+                local argsOpen = {
+                    caseName,
+                    10
+                }
+                game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):InvokeServer(unpack(argsOpen))
                 
-                -- ВАЖНО: Адаптируйте этот путь, если в вашей игре деньги лежат по-другому
-                local leaderstats = player:FindFirstChild("leaderstats")
-                local moneyValue
-                if leaderstats then
-                    moneyValue = leaderstats:FindFirstChild("Money") -- предполагаем, что деньги называются "Money"
-                end
+                -- 2. Продажа всего инвентаря сразу
+                local argsSell = {
+                    "Sell",
+                    "ALL"
+                }
+                game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("Inventory"):FireServer(unpack(argsSell))
+                
+                Rayfield:Notify({
+                   Title = "Smart Farm",
+                   Content = "Куплен/продан кейс: "..caseName,
+                   Duration = 1.0,
+                })
 
-                local currentMoney = moneyValue and moneyValue.Value or 0
-                
-                local caseFound = false
-                
-                -- Перебор кейсов от самого дорогого к самому дешевому
-                for _, caseName in ipairs(CASE_PRIORITY) do
-                    local cost = CASE_PRICES[caseName]
-                    
-                    if currentMoney >= cost then
-                        -- Деньги есть! Открываем и продаем 10 кейсов
-                        
-                        -- 1. Открытие 10 кейсов
-                        local argsOpen = {
-                            caseName,
-                            10
-                        }
-                        game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):InvokeServer(unpack(argsOpen))
-                        
-                        -- 2. Продажа всего инвентаря сразу
-                        local argsSell = {
-                            "Sell",
-                            "ALL"
-                        }
-                        game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("Inventory"):FireServer(unpack(argsSell))
-                        
-                        Rayfield:Notify({
-                           Title = "Smart Farm",
-                           Content = "Куплен/продан кейс: "..caseName,
-                           Duration = 1.0,
-                        })
-
-                        caseFound = true
-                        break -- Купили и продали, выходим из цикла For и проверяем баланс снова.
-                    end
-                end
-                
-                if not caseFound then
-                    -- Если ни один кейс не удалось купить (даже Trash, если он не 0)
-                    Rayfield:Notify({
-                       Title = "Smart Farm",
-                       Content = "Недостаточно денег для любого платного кейса. Ждем...",
-                       Duration = 3.0,
-                    })
-                    wait(3) -- Ждем 3 секунды, чтобы накопить
-                else
-                    wait(1.5) -- Ожидание между успешными циклами покупки/продажи
-                end
+                caseFound = true
+                break -- Купили и продали, сразу проверяем баланс снова.
             end
-            
-            self:Set({Name = "Запустить Smart Auto-Farm"})
+        end
+        
+        if not caseFound then
+            -- Если ни один кейс не удалось купить
+            Rayfield:Notify({
+               Title = "Smart Farm",
+               Content = "Недостаточно денег. Ждем...",
+               Duration = 3.0,
+            })
+            wait(3) 
         else
-            self:Set({Name = "Запустить Smart Auto-Farm"})
-            Rayfield:Notify({Title = "Smart Farm", Content = "Фарм остановлен.", Duration = 2})
+            wait(1.5) -- Пауза между успешными покупками
+        end
+    end
+end
+
+-- Кнопка "Запустить"
+TabSmart:CreateButton({
+   Name = "Запустить Smart Auto-Farm",
+   Callback = function()
+        if not smartFarmActive then
+            smartFarmActive = true
+            Rayfield:Notify({Title = "Smart Farm", Content = "Фарм запущен!", Duration = 2})
+            -- Запускаем фарм в отдельном потоке (spawn)
+            smartFarmThread = spawn(runSmartFarm) 
+        else
+            Rayfield:Notify({Title = "Smart Farm", Content = "Фарм уже запущен.", Duration = 2})
         end
    end,
 })
 
+-- Кнопка "Остановить"
+TabSmart:CreateButton({
+   Name = "Остановить Smart Auto-Farm",
+   Callback = function()
+        if smartFarmActive then
+            smartFarmActive = false
+            Rayfield:Notify({Title = "Smart Farm", Content = "Фарм остановлен.", Duration = 2})
+            -- Принудительная остановка потока (если ваш эксплойт это поддерживает, хотя 'smartFarmActive=false' обычно достаточно)
+            if smartFarmThread and typeof(smartFarmThread) == "thread" and coroutine.status(smartFarmThread) ~= "dead" then
+                -- coroutine.close(smartFarmThread) -- В LUA для Roblox coroutine.close() не используется для остановки
+            end
+            smartFarmThread = nil
+        else
+            Rayfield:Notify({Title = "Smart Farm", Content = "Фарм не был запущен.", Duration = 2})
+        end
+   end,
+})
+
+
 -- =========================================================================
--- !!! ФУНКЦИИ АВТОФАРМА TRASH (ОСТАЛЬНОЙ КОД БЕЗ ИЗМЕНЕНИЙ) !!!
+-- !!! ОСТАЛЬНОЙ КОД АВТОФАРМА (БЕЗ ИЗМЕНЕНИЙ) !!!
 -- =========================================================================
 
 -- ФУНКЦИИ АВТОФАРМА TRASH
