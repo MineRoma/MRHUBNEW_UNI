@@ -49,7 +49,7 @@ local function getPlayerMoney()
 end
 
 -- =========================================================================
--- !!! ФУНКЦИЯ ОСНОВНОГО ЦИКЛА SMART FARM (ОСТАВЛЕНА ЛОГИКА ОРИГИНАЛЬНОГО СКРИПТА, НО С ИСПРАВЛЕНИЕМ ВЫЗОВА) !!!
+-- !!! ФУНКЦИЯ ОСНОВНОГО ЦИКЛА SMART FARM !!!
 -- =========================================================================
 local smartFarmThread = nil 
 local function runSmartFarm()
@@ -64,8 +64,7 @@ local function runSmartFarm()
                 
                 -- 1. Открытие 10 кейсов
                 local argsOpen = { caseName, 10 }
-                -- ИСПРАВЛЕНИЕ: FireServer вместо InvokeServer для стабильности фарма
-                game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):FireServer(unpack(argsOpen))
+                game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):InvokeServer(unpack(argsOpen))
                 
                 wait(0.1) 
                 
@@ -98,7 +97,7 @@ local function runSmartFarm()
 end
 
 -- =========================================================================
--- !!! НОВАЯ ФУНКЦИЯ ДЛЯ МАНУАЛЬНОГО ФАРМА (ГЛАВНАЯ ЦЕЛЬ ИСПРАВЛЕНИЯ) !!!
+-- !!! НОВАЯ ФУНКЦИЯ ДЛЯ МАНУАЛЬНОГО ФАРМА (ИСПОЛЬЗУЕТ selectedCase) !!!
 -- =========================================================================
 local function runManualCaseFarm(runsToBreak)
     local caseToFarm = selectedCase
@@ -107,8 +106,7 @@ local function runManualCaseFarm(runsToBreak)
     -- runsToBreak - это количество циклов, каждый цикл открывает 10 кейсов.
     while true do
         local argsOpen = { caseToFarm, 10 }
-        -- ИСПРАВЛЕНИЕ: FireServer вместо InvokeServer, чтобы не было "Callback error"
-        game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):FireServer(unpack(argsOpen))
+        game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):InvokeServer(unpack(argsOpen))
         
         local argsSell = { "Sell", "ALL" }
         game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("Inventory"):FireServer(unpack(argsSell))
@@ -137,7 +135,7 @@ local Window = Rayfield:CreateWindow({
    ShowText = "MR HUB",
    Theme = "Amethyst", 
    ToggleUIKeybind = "P", 
-   DisableRayfieldPrompts = false, 
+   DisableRayfieldPrompts = false,
    DisableBuildWarnings = false, 
    ConfigurationSaving = {
       Enabled = false,
@@ -163,7 +161,7 @@ local Window = Rayfield:CreateWindow({
 
 -- =========================================================================
 -- !!! СОЗДАНИЕ ВКЛАДОК (ОБНОВЛЕНО: УДАЛЕНЫ ВКЛАДКИ ДЛЯ КЕЙСОВ) !!!
--- =================================
+-- =========================================================================
 local TabSmart = Window:CreateTab("AutoFarm", "dollar-sign")
 -- Оригинальные вкладки для кейсов (Tab8, Tab7, Tab6, Tab5, Tab3, Tab) удалены
 local Tab4 = Window:CreateTab("Halloween", "banknote") 
@@ -262,7 +260,7 @@ local Button = Tab2:CreateButton({
 })
 
 -- =========================================================================
--- !!! HALLOWEEN (ИСПРАВЛЕНО: FireServer для кейсов) !!!
+-- !!! HALLOWEEN (Оригинальный код) !!!
 -- =========================================================================
 local Label = Tab4:CreateLabel("Фарм")
 local Button = Tab4:CreateButton({
@@ -276,39 +274,38 @@ local Button = Tab4:CreateButton({
    end,
 })
 local Label = Tab4:CreateLabel("Кейсы")
--- ИСПРАВЛЕНИЯ: Все кнопки "Открыть кейс" используют FireServer
 local Button = Tab4:CreateButton({
    Name = "Открыть Witchy кейс",
    Callback = function()
    local args = { "Witchy", 1 }
-   game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):FireServer(unpack(args))
+   game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):InvokeServer(unpack(args))
    end,
 })
 local Button = Tab4:CreateButton({
    Name = "Открыть Hollow кейс",
    Callback = function()
    local args = { "Hollow", 1 }
-   game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):FireServer(unpack(args))
+   game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):InvokeServer(unpack(args))
    end,
 })
 local Button = Tab4:CreateButton({
    Name = "Открыть Underworld кейс",
    Callback = function()
    local args = { "Underworld", 1 }
-   game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):FireServer(unpack(args))
+   game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):InvokeServer(unpack(args))
    end,
 })
 local Button = Tab4:CreateButton({
    Name = "Открыть Nightmare кейс",
    Callback = function()
    local args = { "Nightmare", 1 }
-   game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):FireServer(unpack(args))
+   game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):InvokeServer(unpack(args))
    end,
 })
 local Button = Tab4:CreateButton({
    Name = "Открыть Exclusive кейс",
    Callback = function()
    local args = { "Exclusive", 1 }
-   game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):FireServer(unpack(args))
+   game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):InvokeServer(unpack(args))
    end,
 })
