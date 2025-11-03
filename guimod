@@ -83,12 +83,11 @@ local settingsTable = {
 		-- buildwarnings
 		-- rayfieldprompts
 
-	   }
-   }
-	-- System = {
-	-- 	usageAnalytics = {Type = 'toggle', Value = true, Name = 'Anonymised Analytics'},
-	-- }
--- }
+		},
+		System = {
+			usageAnalytics = {Type = 'toggle', Value = true, Name = 'Anonymised Analytics'},
+		}
+	}
 
 -- Settings that have been overridden by the developer. These will not be saved to the user's configuration file
 -- Overridden settings always take precedence over settings in the configuration file, and are cleared if the user changes the setting in the UI
