@@ -1,29 +1,30 @@
 -- =========================================================================
--- !!! ФИКС ЗАГРУЗКИ: ЭТА СТРОКА САМАЯ ЧАСТАЯ ПРИЧИНА ПРОБЛЕМ !!!
+-- !!! ФИКС ЗАГРУЗКИ: ВЕРНУЛ К СТАНДАРТНОМУ ИСПОЛЬЗОВАНИЮ !!!
 -- =========================================================================
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield', true))() [cite: 1]
+-- Загрузка Rayfield UI. Если это не работает, проверьте свой эксплойт/исполнитель.
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield', true))()
 
 -- =========================================================================
 -- !!! ГЛОБАЛЬНЫЕ НАСТРОЙКИ ФАРМА И ПЕРЕМЕННЫЕ GUI !!!
 -- =========================================================================
-local auto = 0
-local smartFarmActive = false 
+local auto = 0 [cite: 2]
+local smartFarmActive = false [cite: 2]
 local selectedCase = "Gold" -- Переменная для хранения выбранного кейса
 
 -- Цены на 10 кейсов 
 local CASE_PRICES = {
-    ["Gold"] = 19990, 
-    ["Manager"] = 8350,
-    ["Office Clerk"] = 6890,
-    ["Plodder"] = 4440,
-    ["Beggar"] = 2200,
-    ["Trash"] = 0, -- Trash всегда бесплатный
-} [cite: 2]
+    ["Gold"] = 19990, [cite: 2]
+    ["Manager"] = 8350, [cite: 2]
+    ["Office Clerk"] = 6890, [cite: 2]
+    ["Plodder"] = 4440, [cite: 2]
+    ["Beggar"] = 2200, [cite: 2]
+    ["Trash"] = 0, -- Trash всегда бесплатный [cite: 2]
+}
 
 -- Приоритет кейсов: от самого дорогого к самому дешевому
 local CASE_PRIORITY = {
-    "Gold", "Manager", "Office Clerk", "Plodder", "Beggar", "Trash"
-} [cite: 2]
+    "Gold", "Manager", "Office Clerk", "Plodder", "Beggar", "Trash" [cite: 2]
+}
 
 -- =========================================================================
 -- !!! ФУНКЦИЯ ПОЛУЧЕНИЯ БАЛАНСА (НАДЕЖНАЯ) !!!
@@ -32,13 +33,11 @@ local function getPlayerMoney()
     local player = game.Players.LocalPlayer
     local moneyValue = 0
 
-    -- Использование вашего пути к балансу: game.Players.LocalPlayer.PlayerGui.MainGui.TopFrame.Balance.SubVal
     local success, moneyObject = pcall(function()
-        return player.PlayerGui.MainGui.TopFrame.Balance.SubVal
-    end) [cite: 3]
+        return player.PlayerGui.MainGui.TopFrame.Balance.SubVal [cite: 3]
+    end)
     
     if success and moneyObject then
-        -- Читаем .Value и конвертируем в число
         local value = tonumber(moneyObject.Value)
         if value ~= nil then [cite: 4]
             moneyValue = value
@@ -49,7 +48,7 @@ local function getPlayerMoney()
 end
 
 -- =========================================================================
--- !!! ФУНКЦИЯ ОСНОВНОГО ЦИКЛА SMART FARM (С НОВЫМ КД) !!!
+-- !!! ФУНКЦИЯ ОСНОВНОГО ЦИКЛА SMART FARM !!!
 -- =========================================================================
 local smartFarmThread = nil 
 local function runSmartFarm()
@@ -57,24 +56,19 @@ local function runSmartFarm()
         local currentMoney = getPlayerMoney()
         local caseFound = false
         
-        -- Цикл всегда начинает проверку с самого дорогого кейса
-        for _, caseName in ipairs(CASE_PRIORITY) do [cite: 7]
-            local cost = CASE_PRICES[caseName]
+        for _, caseName in ipairs(CASE_PRIORITY) do
+            local cost = CASE_PRICES[caseName] [cite: 7]
             
-            -- *** ПРОВЕРКА: ЕСЛИ ДЕНЕГ ХВАТАЕТ, ТО КУПИТ ***
             if currentMoney >= cost then
                 
-                -- 1. Открытие 10 кейсов
                 local argsOpen = { caseName, 10 } [cite: 8]
                 game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):InvokeServer(unpack(argsOpen))
                 
-                wait(0.1) -- Пауза для обновления инвентаря/баланса
+                wait(0.1) 
                 
-                -- 2. Продажа всего инвентаря сразу
                 local argsSell = { "Sell", "ALL" } [cite: 9]
                 game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("Inventory"):FireServer(unpack(argsSell))
                 
-                -- ИЗМЕНЕНО: Новое имя уведомления
                 Rayfield:Notify({
                    Title = "AutoFarm Stars", [cite: 10]
                    Content = "КУПЛЕНО: "..caseName,
@@ -82,7 +76,7 @@ local function runSmartFarm()
                 })
 
                 caseFound = true
-                break -- Успешная покупка: прерываем цикл и начинаем новую проверку с Gold [cite: 11]
+                break [cite: 11]
             end
         end
         
@@ -94,21 +88,20 @@ local function runSmartFarm()
             })
             wait(3) 
         else
-            -- ИЗМЕНЕНО: Увеличенная пауза
-            wait(2.5) [cite: 12]
+            wait(2.5) -- Увеличенная пауза [cite: 12]
         end
     end
 end
 
 -- =========================================================================
--- !!! ФУНКЦИЯ ДЛЯ МАНУАЛЬНОГО ФАРМА (С ЛОГИКОЙ ВАШИХ КНОПОК) !!!
+-- !!! ФУНКЦИЯ ДЛЯ МАНУАЛЬНОГО ФАРМА (ИСПОЛЬЗУЕТ selectedCase) !!!
 -- =========================================================================
 local function runManualCaseFarm(runsToBreak)
     local caseToFarm = selectedCase
     auto = 0
     local startTime = tick()
 
-    -- Проверка на количество циклов (1 run = 10 кейсов)
+    -- 1 run = 10 кейсов
     while true do
         local argsOpen = { caseToFarm, 10 }
         game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):InvokeServer(unpack(argsOpen))
@@ -129,16 +122,16 @@ local function runManualCaseFarm(runsToBreak)
 end
 
 -- =========================================================================
--- !!! GUI НАСТРОЙКА !!!
+-- !!! GUI НАСТРОЙКА (ПАРАМЕТРЫ ИЗ ВАШЕГО ФАЙЛА) !!!
 -- =========================================================================
 local Window = Rayfield:CreateWindow({
    Name = "NFT BATTLE | MR HUB (t.me/minrteam)", [cite: 13]
    Icon = 0, 
    LoadingTitle = "MR HUB (t.me/minrteam)", [cite: 13]
    LoadingSubtitle = "By MineRoma Tem", [cite: 13]
-   ShowText = "MR HUB", [cite: 13]
-   Theme = "Amethyst", [cite: 13]
-   ToggleUIKeybind = "P", [cite: 13]
+   ShowText = "MR HUB", 
+   Theme = "Amethyst", 
+   ToggleUIKeybind = "P", 
    DisableRayfieldPrompts = false,
    DisableBuildWarnings = false, 
    ConfigurationSaving = {
@@ -149,13 +142,13 @@ local Window = Rayfield:CreateWindow({
    Discord = {
       Enabled = false, 
       Invite = "noinvitelink", 
-      RememberJoins = true 
+      RememberJoins = true [cite: 14]
    },
    KeySystem = false, 
    KeySettings = {
       Title = "Untitled",
       Subtitle = "Key System",
-      Note = "No method of obtaining the key is provided", 
+      Note = "No method of obtaining the key is provided", [cite: 14]
       FileName = "Key", 
       SaveKey = true, 
       GrabKeyFromSite = false, [cite: 15]
@@ -164,10 +157,9 @@ local Window = Rayfield:CreateWindow({
 })
 
 -- =========================================================================
--- !!! СОЗДАНИЕ ВКЛАДОК (ОБНОВЛЕНО) !!!
+-- !!! СОЗДАНИЕ ВКЛАДОК (ОБНОВЛЕНО: ТОЛЬКО НУЖНЫЕ) !!!
 -- =========================================================================
 local TabSmart = Window:CreateTab("AutoFarm", "dollar-sign")
--- УДАЛЕНЫ старые вкладки Gold, Manager, Office Clerk, Plodder, Beggar, Trash
 local Tab4 = Window:CreateTab("Halloween", "banknote") 
 local Tab2 = Window:CreateTab("Info", "book-text") 
 local Tab1 = Window:CreateTab("Credits", "creative-commons") 
@@ -180,11 +172,11 @@ Rayfield:Notify({
 })
 
 -- =========================================================================
--- !!! AutoFarm (Smart и Manual) !!!
+-- !!! AutoFarm (Smart и Manual Case Farm) !!!
 -- =========================================================================
 
--- 1. SMART AUTO-FARM GUI (Без изменений)
-local Label = TabSmart:CreateLabel("Farm stars") [cite: 16]
+-- 1. SMART AUTO-FARM GUI 
+local LabelSmart = TabSmart:CreateLabel("Farm stars") [cite: 16]
 TabSmart:CreateButton({
    Name = "Запустить AutoFarm Stars",
    Callback = function()
@@ -230,6 +222,7 @@ TabSmart:CreateDropdown({
 })
 
 -- 3. КНОПКИ МАНУАЛЬНОГО ФАРМА (вызывают runManualCaseFarm с runsToBreak)
+-- runsToBreak - это количество циклов, каждый цикл открывает 10 кейсов.
 TabSmart:CreateButton({ Name = "Фарм 1МЛН кейсов", Callback = function() runManualCaseFarm(100000) end, })
 TabSmart:CreateButton({ Name = "Фарм 100К кейсов", Callback = function() runManualCaseFarm(10000) end, })
 TabSmart:CreateButton({ Name = "Фарм 10К кейсов", Callback = function() runManualCaseFarm(1000) end, })
@@ -241,7 +234,7 @@ TabSmart:CreateButton({ Name = "Фарм 10 кейсов", Callback = function()
 -- =========================================================================
 -- !!! CREDITS (Восстановлено) !!!
 -- =========================================================================
-local Label = Tab1:CreateLabel("Кодер: mineroma_off") [cite: 19]
+local Label = Tab1:CreateLabel("Кодер: mineroma_off") [cite: 20]
 local Label = Tab1:CreateLabel("Тестер: mineroma_off, Kiril74939") [cite: 20]
 local Label = Tab1:CreateLabel("Моральная поддержка: mineroma_off") [cite: 20]
 
@@ -265,7 +258,7 @@ local Button = Tab2:CreateButton({
 -- =========================================================================
 -- !!! HALLOWEEN (Восстановлено) !!!
 -- =========================================================================
-local Label = Tab4:CreateLabel("Фарм") [cite: 26]
+local Label = Tab4:CreateLabel("Фарм")
 local Button = Tab4:CreateButton({
    Name = "Фарм тыкв",
    Callback = function() [cite: 27]
@@ -276,7 +269,7 @@ local Button = Tab4:CreateButton({
    end
    end,
 })
-local Label = Tab4:CreateLabel("Кейсы") [cite: 27]
+local Label = Tab4:CreateLabel("Кейсы")
 local Button = Tab4:CreateButton({ Name = "Открыть Witchy кейс", Callback = function() local args = { "Witchy", 1 } game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):InvokeServer(unpack(args)) end, })
 local Button = Tab4:CreateButton({ Name = "Открыть Hollow кейс", Callback = function() local args = { "Hollow", 1 } game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):InvokeServer(unpack(args)) end, })
 local Button = Tab4:CreateButton({ Name = "Открыть Underworld кейс", Callback = function() local args = { "Underworld", 1 } game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):InvokeServer(unpack(args)) end, }) [cite: 28]
