@@ -1,7 +1,7 @@
 -- =========================================================================
 -- !!! ФИКС ЗАГРУЗКИ: УДАЛЕН ПРОБЛЕМНЫЙ ПАРАМЕТР ИЗ GET !!!
 -- =========================================================================
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/MineRoma/MRHUBNEW_UNI/refs/heads/main/guimod'))()
 
 -- =========================================================================
 -- !!! ГЛОБАЛЬНЫЕ НАСТРОЙКИ ФАРМА И ПЕРЕМЕННЫЕ GUI !!!
