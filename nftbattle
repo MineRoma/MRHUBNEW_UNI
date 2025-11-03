@@ -105,7 +105,7 @@ end
 -- !!! GUI НАСТРОЙКА !!!
 -- =========================================================================
 local Window = Rayfield:CreateWindow({
-   Name = "Автофарм кейсов",
+   Name = "NFT BATTLE | MR HUB (t.me/minrteam)",
    Icon = 0, 
    LoadingTitle = "не мой гуи",
    LoadingSubtitle = "by Sirius",
