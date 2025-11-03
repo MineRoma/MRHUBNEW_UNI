@@ -2,7 +2,7 @@
 
 	Rayfield Interface Suite
 	by Sirius
-	modification by mineroma team
+	modification by mineroma team 1.0
 
 	shlex  | Designing + Programming
 	iRay   | Programming
@@ -83,6 +83,7 @@ local settingsTable = {
 		-- buildwarnings
 		-- rayfieldprompts
 
+		}
 	}
 	-- System = {
 	-- 	usageAnalytics = {Type = 'toggle', Value = true, Name = 'Anonymised Analytics'},
