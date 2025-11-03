@@ -107,9 +107,9 @@ end
 local Window = Rayfield:CreateWindow({
    Name = "NFT BATTLE | MR HUB (t.me/minrteam)",
    Icon = 0, 
-   LoadingTitle = "не мой гуи",
-   LoadingSubtitle = "by Sirius",
-   ShowText = "Автофарм Trash кейсов",
+   LoadingTitle = "MR HUB (t.me/minrteam)",
+   LoadingSubtitle = "By MineRoma Tem",
+   ShowText = "NFT BATTLE | MR HUB",
    Theme = "Amethyst", 
    ToggleUIKeybind = "K", 
    DisableRayfieldPrompts = false,
