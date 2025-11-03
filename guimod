@@ -83,11 +83,14 @@ local settingsTable = {
 		-- buildwarnings
 		-- rayfieldprompts
 
-		},
+		}, -- Закрывающая скобка для General
+
+--[[
 		System = {
-			usageAnalytics = {Type = 'toggle', Value = true, Name = 'Anonymised Analytics'},
+			usageAnalytics = {Type = 'toggle', Value = false, Name = 'Бесполезная аналитика (вырезана)'},
 		}
-	}
+]]
+} -- Закрывающая скобка для settingsTable
 
 -- Settings that have been overridden by the developer. These will not be saved to the user's configuration file
 -- Overridden settings always take precedence over settings in the configuration file, and are cleared if the user changes the setting in the UI
