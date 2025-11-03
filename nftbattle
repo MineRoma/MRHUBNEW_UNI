@@ -109,9 +109,9 @@ local Window = Rayfield:CreateWindow({
    Icon = 0, 
    LoadingTitle = "MR HUB (t.me/minrteam)",
    LoadingSubtitle = "By MineRoma Tem",
-   ShowText = "NFT BATTLE | MR HUB",
+   ShowText = "MR HUB",
    Theme = "Amethyst", 
-   ToggleUIKeybind = "K", 
+   ToggleUIKeybind = "P", 
    DisableRayfieldPrompts = false,
    DisableBuildWarnings = false, 
    ConfigurationSaving = {
@@ -139,7 +139,7 @@ local Window = Rayfield:CreateWindow({
 -- =========================================================================
 -- !!! СОЗДАНИЕ ВКЛАДОК И КНОПКИ SMART FARM !!!
 -- =========================================================================
-local TabSmart = Window:CreateTab("Smart Farm", "dollar-sign")
+local TabSmart = Window:CreateTab("AutoFarm", "dollar-sign")
 local Tab8 = Window:CreateTab("Gold", "banknote") 
 local Tab7 = Window:CreateTab("Manager", "banknote") 
 local Tab6 = Window:CreateTab("Office Clerk", "banknote") 
@@ -158,6 +158,7 @@ Rayfield:Notify({
 })
 
 -- SMART AUTO-FARM GUI
+local Label = TabSmart:CreateLabel("Farm stars")
 TabSmart:CreateButton({
    Name = "Запустить AutoFarm Stars",
    Callback = function()
