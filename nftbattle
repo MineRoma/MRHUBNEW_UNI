@@ -7,7 +7,17 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield', true))(
 -- !!! ГЛОБАЛЬНЫЕ НАСТРОЙКИ ФАРМА !!!
 -- =========================================================================
 local auto = 0
-local smartFarmActive = false -- Управление Smart Farm
+local smartFarmActive = false 
+
+-- Цены на 10 кейсов 
+local CASE_PRICES = {
+    ["Gold"] = 19990, 
+    ["Manager"] = 8350,
+    ["Office Clerk"] = 6890,
+    ["Plodder"] = 4440,
+    ["Beggar"] = 2200,
+    ["Trash"] = 0, -- Trash всегда бесплатный
+}
 
 -- Приоритет кейсов: от самого дорогого к самому дешевому
 local CASE_PRIORITY = {
@@ -15,53 +25,77 @@ local CASE_PRIORITY = {
 }
 
 -- =========================================================================
--- !!! ФУНКЦИЯ ОСНОВНОГО ЦИКЛА SMART FARM (ЛОГИКА "TRY/DOWNGRADE") !!!
+-- !!! ФУНКЦИЯ ПОЛУЧЕНИЯ БАЛАНСА (ИСПРАВЛЕНА ПО ВАШЕМУ ПУТИ) !!!
+-- =========================================================================
+local function getPlayerMoney()
+    local player = game.Players.LocalPlayer
+    local moneyValue = 0
+
+    -- Используем pcall для безопасного доступа по вашему пути: game.Players.LocalPlayer.PlayerGui.MainGui.TopFrame.Balance.SubVal
+    local success, moneyObject = pcall(function()
+        return player.PlayerGui.MainGui.TopFrame.Balance.SubVal
+    end)
+    
+    if success and moneyObject then
+        -- Читаем .Value и конвертируем в число
+        local value = tonumber(moneyObject.Value)
+        if value ~= nil then
+            moneyValue = value
+        end
+    end
+
+    return moneyValue -- Вернет реальный баланс или 0, если путь сломан.
+end
+
+-- =========================================================================
+-- !!! ФУНКЦИЯ ОСНОВНОГО ЦИКЛА SMART FARM (ЛОГИКА "TRY/DOWNGRADE" НА БАЗЕ БАЛАНСА) !!!
 -- =========================================================================
 local smartFarmThread = nil 
 local function runSmartFarm()
     while smartFarmActive do
+        local currentMoney = getPlayerMoney()
         local caseFound = false
         
-        -- Цикл всегда начинается с самого дорогого кейса (Gold)
+        -- Выводим баланс, который видит скрипт, для проверки
+        Rayfield:Notify({
+            Title = "Баланс Скрипта",
+            Content = "Видит: " .. string.format("₽%.0f", currentMoney),
+            Duration = 1.0,
+            Image = "x"
+        })
+
+        -- Цикл всегда начинает проверку с самого дорогого кейса
         for _, caseName in ipairs(CASE_PRIORITY) do
+            local cost = CASE_PRICES[caseName]
             
-            -- 1. ПОПЫТКА ОТКРЫТИЯ (InvokeServer)
-            local argsOpen = { caseName, 10 }
-            -- Ожидаем результат от сервера. Если не nil, считаем успешной попыткой.
-            local result = game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):InvokeServer(unpack(argsOpen))
-            
-            -- Проверяем результат. Если сервер что-то вернул (не nil), считаем, что покупка удалась.
-            if result ~= nil and result ~= 0 then 
+            -- ПРОВЕРКА: ЕСЛИ ДЕНЕГ ХВАТАЕТ
+            if currentMoney >= cost then
                 
-                -- 2. Продажа
-                wait(0.1) -- Критическая пауза для обновления инвентаря
+                -- 1. Открытие 10 кейсов
+                local argsOpen = { caseName, 10 }
+                game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):InvokeServer(unpack(argsOpen))
+                
+                wait(0.1) -- Пауза для обновления инвентаря/баланса
+                
+                -- 2. Продажа всего инвентаря сразу
                 local argsSell = { "Sell", "ALL" }
                 game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("Inventory"):FireServer(unpack(argsSell))
                 
                 Rayfield:Notify({
                    Title = "Smart Farm",
-                   Content = "КУПЛЕНО/ПРОДАНО: "..caseName,
+                   Content = "КУПЛЕНО: "..caseName,
                    Duration = 1.0,
                 })
 
                 caseFound = true
-                break -- Успешная покупка: прерываем цикл, чтобы начать следующую попытку с Gold
-            else
-                -- Сервер отклонил покупку (нет денег, лимит и т.п.). 
-                -- Переходим к следующему, более дешевому кейсу.
-                Rayfield:Notify({
-                   Title = "Smart Farm",
-                   Content = "Попытка " .. caseName .. " отклонена. Переход.",
-                   Duration = 0.5,
-                })
+                break -- Успешная покупка: прерываем цикл и начинаем новую проверку с Gold
             end
         end
         
         if not caseFound then
-            -- Если не удалось купить даже Trash-кейс (ошибка сервера или эксплойта)
             Rayfield:Notify({
                Title = "Smart Farm",
-               Content = "Не удалось купить ни один кейс. Ждем 3 сек.",
+               Content = "Недостаточно денег даже на Beggar. Ждем 3 сек.",
                Duration = 3.0,
             })
             wait(3) 
@@ -76,46 +110,41 @@ end
 -- =========================================================================
 local Window = Rayfield:CreateWindow({
    Name = "Автофарм кейсов",
-   Icon = 0, -- Icon in Topbar. Can use Lucide Icons (string) or Roblox Image (number). 0 to use no icon (default).
+   Icon = 0, 
    LoadingTitle = "не мой гуи",
    LoadingSubtitle = "by Sirius",
-   ShowText = "Автофарм Trash кейсов", -- for mobile users to unhide rayfield, change if you'd like
-   Theme = "Default", -- Check https://docs.sirius.menu/rayfield/configuration/themes
-
-   ToggleUIKeybind = "K", -- The keybind to toggle the UI visibility (string like "K" or Enum.KeyCode)
-
+   ShowText = "Автофарм Trash кейсов",
+   Theme = "Default", 
+   ToggleUIKeybind = "K", 
    DisableRayfieldPrompts = false,
-   DisableBuildWarnings = false, -- Prevents Rayfield from warning when the script has a version mismatch with the interface
-
+   DisableBuildWarnings = false, 
    ConfigurationSaving = {
       Enabled = false,
-      FolderName = nil, -- Create a custom folder for your hub/game
+      FolderName = nil, 
       FileName = "Big Hub"
    },
-
    Discord = {
-      Enabled = false, -- Prompt the user to join your Discord server if their executor supports it
-      Invite = "noinvitelink", -- The Discord invite code, do not include discord.gg/. E.g. discord.gg/ ABCD would be ABCD
-      RememberJoins = true -- Set this to false to make them join the discord every time they load it up
+      Enabled = false, 
+      Invite = "noinvitelink", 
+      RememberJoins = true 
    },
-
-   KeySystem = false, -- Set this to true to use our key system
+   KeySystem = false, 
    KeySettings = {
       Title = "Untitled",
       Subtitle = "Key System",
-      Note = "No method of obtaining the key is provided", -- Use this to tell the user how to get a key
-      FileName = "Key", -- It is recommended to use something unique as other scripts using Rayfield may overwrite your key file
-      SaveKey = true, -- The user's key will be saved, but if you change the key, they will be unable to use your script
-      GrabKeyFromSite = false, -- If this is true, set Key below to the RAW site you would like Rayfield to get the key from
-      Key = {"Hello"} -- List of keys that will be accepted by the system, can be RAW file links (pastebin, github etc) or simple strings ("hello","key22")
+      Note = "No method of obtaining the key is provided", 
+      FileName = "Key", 
+      SaveKey = true, 
+      GrabKeyFromSite = false, 
+      Key = {"Hello"} 
    }
 })
 
 -- =========================================================================
--- !!! СОЗДАНИЕ ВКЛАДОК !!!
+-- !!! СОЗДАНИЕ ВКЛАДОК И КНОПКИ SMART FARM !!!
 -- =========================================================================
 local TabSmart = Window:CreateTab("Smart Farm", "dollar-sign")
-local Tab8 = Window:CreateTab("Gold", "banknote")
+local Tab8 = Window:CreateTab("Gold", "banknote") 
 local Tab7 = Window:CreateTab("Manager", "banknote") 
 local Tab6 = Window:CreateTab("Office Clerk", "banknote") 
 local Tab5 = Window:CreateTab("Plodder", "banknote") 
@@ -132,15 +161,13 @@ Rayfield:Notify({
    Image = "x",
 })
 
--- =========================================================================
--- !!! SMART AUTO-FARM GUI !!!
--- =========================================================================
+-- SMART AUTO-FARM GUI
 TabSmart:CreateButton({
-   Name = "Запустить Smart Auto-Farm (Try/Downgrade)",
+   Name = "Запустить Smart Auto-Farm",
    Callback = function()
         if not smartFarmActive then
             smartFarmActive = true
-            Rayfield:Notify({Title = "Smart Farm", Content = "Фарм запущен! Попытка Gold.", Duration = 2})
+            Rayfield:Notify({Title = "Smart Farm", Content = "Фарм запущен! Проверьте баланс в уведомлениях.", Duration = 3})
             smartFarmThread = spawn(runSmartFarm) 
         else
             Rayfield:Notify({Title = "Smart Farm", Content = "Фарм уже запущен.", Duration = 2})
@@ -160,10 +187,6 @@ TabSmart:CreateButton({
         end
    end,
 })
-
--- =========================================================================
--- !!! ДРУГИЕ ВКЛАДКИ (КОД ИЗ ВАШЕГО ФАЙЛА) !!!
--- =========================================================================
 
 -- CREDITS
 local Label = Tab1:CreateLabel("Кодер: Авед")
