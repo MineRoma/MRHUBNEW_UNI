@@ -25,13 +25,13 @@ local CASE_PRIORITY = {
 }
 
 -- =========================================================================
--- !!! ФУНКЦИЯ ПОЛУЧЕНИЯ БАЛАНСА (ИСПРАВЛЕНА ПО ВАШЕМУ ПУТИ) !!!
+-- !!! ФУНКЦИЯ ПОЛУЧЕНИЯ БАЛАНСА (НАДЕЖНАЯ) !!!
 -- =========================================================================
 local function getPlayerMoney()
     local player = game.Players.LocalPlayer
     local moneyValue = 0
 
-    -- Используем pcall для безопасного доступа по вашему пути: game.Players.LocalPlayer.PlayerGui.MainGui.TopFrame.Balance.SubVal
+    -- Использование вашего пути к балансу: game.Players.LocalPlayer.PlayerGui.MainGui.TopFrame.Balance.SubVal
     local success, moneyObject = pcall(function()
         return player.PlayerGui.MainGui.TopFrame.Balance.SubVal
     end)
@@ -44,11 +44,11 @@ local function getPlayerMoney()
         end
     end
 
-    return moneyValue -- Вернет реальный баланс или 0, если путь сломан.
+    return moneyValue 
 end
 
 -- =========================================================================
--- !!! ФУНКЦИЯ ОСНОВНОГО ЦИКЛА SMART FARM (ЛОГИКА "TRY/DOWNGRADE" НА БАЗЕ БАЛАНСА) !!!
+-- !!! ФУНКЦИЯ ОСНОВНОГО ЦИКЛА SMART FARM (ИСПРАВЛЕНА: БЕЗ БАЛАНС-СПАМА И НОВОЕ КД) !!!
 -- =========================================================================
 local smartFarmThread = nil 
 local function runSmartFarm()
@@ -56,19 +56,13 @@ local function runSmartFarm()
         local currentMoney = getPlayerMoney()
         local caseFound = false
         
-        -- Выводим баланс, который видит скрипт, для проверки
-        Rayfield:Notify({
-            Title = "Баланс Скрипта",
-            Content = "Видит: " .. string.format("₽%.0f", currentMoney),
-            Duration = 1.0,
-            Image = "x"
-        })
+        -- Уведомление о балансе УДАЛЕНО по вашему запросу
 
         -- Цикл всегда начинает проверку с самого дорогого кейса
         for _, caseName in ipairs(CASE_PRIORITY) do
             local cost = CASE_PRICES[caseName]
             
-            -- ПРОВЕРКА: ЕСЛИ ДЕНЕГ ХВАТАЕТ
+            -- *** ПРОВЕРКА: ЕСЛИ ДЕНЕГ ХВАТАЕТ, ТО КУПИТ ***
             if currentMoney >= cost then
                 
                 -- 1. Открытие 10 кейсов
@@ -81,9 +75,10 @@ local function runSmartFarm()
                 local argsSell = { "Sell", "ALL" }
                 game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("Inventory"):FireServer(unpack(argsSell))
                 
+                -- ИЗМЕНЕНО: Новое имя уведомления
                 Rayfield:Notify({
-                   Title = "Smart Farm",
-                   Content = "КУПЛЕНО: "..caseName,
+                   Title = "AutoFarm Stars", 
+                   Content = "Куплен кейс: "..caseName,
                    Duration = 1.0,
                 })
 
@@ -100,7 +95,8 @@ local function runSmartFarm()
             })
             wait(3) 
         else
-            wait(1.5) -- Пауза между успешными попытками фарма
+            -- ИЗМЕНЕНО: Увеличенная пауза
+            wait(2.5) 
         end
     end
 end
@@ -156,50 +152,51 @@ local Tab1 = Window:CreateTab("Credits", "creative-commons")
 
 Rayfield:Notify({
    Title = "ВНИМАНИЕ",
-   Content = "На телефонах возможны баги",
+   Content = "Возможны баги",
    Duration = 6.5,
    Image = "x",
 })
 
 -- SMART AUTO-FARM GUI
 TabSmart:CreateButton({
-   Name = "Запустить Smart Auto-Farm",
+   Name = "Запустить AutoFarm Stars",
    Callback = function()
         if not smartFarmActive then
             smartFarmActive = true
-            Rayfield:Notify({Title = "Smart Farm", Content = "Фарм запущен! Проверьте баланс в уведомлениях.", Duration = 3})
+            Rayfield:Notify({Title = "AutoFarm Stars", Content = "AutoFarm Stars запущен! Стараюсь быть не бездарем и фармить нормально.", Duration = 3})
             smartFarmThread = spawn(runSmartFarm) 
         else
-            Rayfield:Notify({Title = "Smart Farm", Content = "Фарм уже запущен.", Duration = 2})
+            Rayfield:Notify({Title = "AutoFarm Stars", Content = "AutoFarm Stars был уже запущен! Дурачело.", Duration = 2})
         end
    end,
 })
 
 TabSmart:CreateButton({
-   Name = "Остановить Smart Auto-Farm",
+   Name = "Остановить AutoFarm Stars",
    Callback = function()
         if smartFarmActive then
             smartFarmActive = false
-            Rayfield:Notify({Title = "Smart Farm", Content = "Фарм остановлен.", Duration = 2})
+            Rayfield:Notify({Title = "AutoFarm Stars", Content = "AutoFarm Stars остановлен :(.", Duration = 2})
             smartFarmThread = nil
         else
-            Rayfield:Notify({Title = "Smart Farm", Content = "Фарм не был запущен.", Duration = 2})
+            Rayfield:Notify({Title = "AutoFarm Stars", Content = "Что то тут не так... Бро ты его даже не запускал.", Duration = 2})
         end
    end,
 })
 
 -- CREDITS
-local Label = Tab1:CreateLabel("Кодер: Авед")
-local Label = Tab1:CreateLabel("Тестер: Авед, Дэмэнтый")
-local Label = Tab1:CreateLabel("Гуи: Sirius")
-local Label = Tab1:CreateLabel("Мария: Зайцева")
+local Label = Tab1:CreateLabel("Кодер: mineroma_off")
+local Label = Tab1:CreateLabel("Тестер: mineroma_off, Kiril74939")
+local Label = Tab1:CreateLabel("Моральная поддержка: mineroma_off")
 
 -- INFO
-local Label = Tab2:CreateLabel("Тестировал на: Delta(android)")
-local Label = Tab2:CreateLabel("Тестировал на: Seliware(desktop)")
-local Label = Tab2:CreateLabel("Это open source проект")
-local Label = Tab2:CreateLabel("Донатов нету, разраб хороший прост")
-local Label = Tab2:CreateLabel("Ксено и соляра юзеры пидорасы")
+local Label = Tab2:CreateLabel("Проводились тесты на: Delta (android)")
+local Label = Tab2:CreateLabel("Проводились тесты на: Krnl (android)")
+local Label = Tab2:CreateLabel("Проводились тесты на: Xeno (pc)")
+local Label = Tab2:CreateLabel("Если честно я спастил уже готовый проект, просто добавил функции некоторые")
+local Label = Tab2:CreateLabel("Хотите поддержать? подпишись на тгк @minrteam")
+local Label = Tab2:CreateLabel("")
+local Label = Tab2:CreateLabel("С любовью от команды MineRoma Team")
 local Button = Tab2:CreateButton({
    Name = "Полностью закрыть GUI",
    Callback = function()
