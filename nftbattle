@@ -49,7 +49,7 @@ local function getPlayerMoney()
 end
 
 -- =========================================================================
--- !!! ФУНКЦИЯ ОСНОВНОГО ЦИКЛА SMART FARM !!!
+-- !!! ФУНКЦИЯ ОСНОВНОГО ЦИКЛА SMART FARM (ИСПРАВЛЕНО) !!!
 -- =========================================================================
 local smartFarmThread = nil 
 local function runSmartFarm()
@@ -62,9 +62,9 @@ local function runSmartFarm()
             
             if currentMoney >= cost then
                 
-                -- 1. Открытие 10 кейсов
+                -- 1. Открытие 10 кейсов (ИСПРАВЛЕНО НА FireServer)
                 local argsOpen = { caseName, 10 }
-                game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):InvokeServer(unpack(argsOpen))
+                game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):FireServer(unpack(argsOpen))
                 
                 wait(0.1) 
                 
@@ -97,7 +97,7 @@ local function runSmartFarm()
 end
 
 -- =========================================================================
--- !!! НОВАЯ ФУНКЦИЯ ДЛЯ МАНУАЛЬНОГО ФАРМА (ИСПОЛЬЗУЕТ selectedCase) !!!
+-- !!! НОВАЯ ФУНКЦИЯ ДЛЯ МАНУАЛЬНОГО ФАРМА (ИСПРАВЛЕНО) !!!
 -- =========================================================================
 local function runManualCaseFarm(runsToBreak)
     local caseToFarm = selectedCase
@@ -106,7 +106,8 @@ local function runManualCaseFarm(runsToBreak)
     -- runsToBreak - это количество циклов, каждый цикл открывает 10 кейсов.
     while true do
         local argsOpen = { caseToFarm, 10 }
-        game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):InvokeServer(unpack(argsOpen))
+        -- ИСПРАВЛЕНИЕ: FireServer вместо InvokeServer
+        game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):FireServer(unpack(argsOpen))
         
         local argsSell = { "Sell", "ALL" }
         game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("Inventory"):FireServer(unpack(argsSell))
@@ -260,7 +261,7 @@ local Button = Tab2:CreateButton({
 })
 
 -- =========================================================================
--- !!! HALLOWEEN (Оригинальный код) !!!
+-- !!! HALLOWEEN (ИСПРАВЛЕНО - FireServer) !!!
 -- =========================================================================
 local Label = Tab4:CreateLabel("Фарм")
 local Button = Tab4:CreateButton({
@@ -268,44 +269,47 @@ local Button = Tab4:CreateButton({
    Callback = function()
    while true do
     local args = { "Claim" }
+    -- InvokeServer здесь может быть корректен, если это НЕ спам-вызов, но для безопасности оставим как есть,
+    -- так как вызов раз в 5 секунд не должен давать Callback Error.
     game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("Halloween"):InvokeServer(unpack(args))
     wait(5)
    end
    end,
 })
 local Label = Tab4:CreateLabel("Кейсы")
+-- ИСПРАВЛЕНИЯ: Все кнопки "Открыть кейс" используют FireServer
 local Button = Tab4:CreateButton({
    Name = "Открыть Witchy кейс",
    Callback = function()
    local args = { "Witchy", 1 }
-   game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):InvokeServer(unpack(args))
+   game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):FireServer(unpack(args))
    end,
 })
 local Button = Tab4:CreateButton({
    Name = "Открыть Hollow кейс",
    Callback = function()
    local args = { "Hollow", 1 }
-   game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):InvokeServer(unpack(args))
+   game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):FireServer(unpack(args))
    end,
 })
 local Button = Tab4:CreateButton({
    Name = "Открыть Underworld кейс",
    Callback = function()
    local args = { "Underworld", 1 }
-   game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):InvokeServer(unpack(args))
+   game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):FireServer(unpack(args))
    end,
 })
 local Button = Tab4:CreateButton({
    Name = "Открыть Nightmare кейс",
    Callback = function()
    local args = { "Nightmare", 1 }
-   game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):InvokeServer(unpack(args))
+   game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):FireServer(unpack(args))
    end,
 })
 local Button = Tab4:CreateButton({
    Name = "Открыть Exclusive кейс",
    Callback = function()
    local args = { "Exclusive", 1 }
-   game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):InvokeServer(unpack(args))
+   game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):FireServer(unpack(args))
    end,
 })
