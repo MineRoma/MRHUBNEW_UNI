@@ -97,23 +97,24 @@ local function runSmartFarm()
 end
 
 -- =========================================================================
--- !!! НОВАЯ ФУНКЦИЯ ДЛЯ МАНУАЛЬНОГО ФАРМА (ИСПОЛЬЗУЕТ selectedCase) !!!
+-- !!! ИСПРАВЛЕННАЯ ФУНКЦИЯ ДЛЯ МАНУАЛЬНОГО ФАРМА (Case Farm) !!!
 -- =========================================================================
 local function runManualCaseFarm(runsToBreak)
     local caseToFarm = selectedCase
-    auto = 0
+    auto = 0 -- Сброс счетчика перед началом
 
     -- runsToBreak - это количество циклов, каждый цикл открывает 10 кейсов.
-    while true do
+    while auto < runsToBreak do 
+        -- 1. Открытие 10 кейсов
         local argsOpen = { caseToFarm, 10 }
         game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):InvokeServer(unpack(argsOpen))
         
+        -- 2. Продажа всего инвентаря сразу
         local argsSell = { "Sell", "ALL" }
         game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("Inventory"):FireServer(unpack(argsSell))
         
         wait(1)
         auto += 1
-        if auto == runsToBreak then auto = 0; break end
     end
     
     Rayfield:Notify({
@@ -121,6 +122,7 @@ local function runManualCaseFarm(runsToBreak)
         Content = string.format("Завершено %d кейсов %s.", runsToBreak * 10, caseToFarm),
         Duration = 3.0,
     })
+    auto = 0 -- Сброс auto после завершения
 end
 
 
@@ -160,10 +162,9 @@ local Window = Rayfield:CreateWindow({
 })
 
 -- =========================================================================
--- !!! СОЗДАНИЕ ВКЛАДОК (ОБНОВЛЕНО: УДАЛЕНЫ ВКЛАДКИ ДЛЯ КЕЙСОВ) !!!
+-- !!! СОЗДАНИЕ ВКЛАДОК !!!
 -- =========================================================================
 local TabSmart = Window:CreateTab("AutoFarm", "dollar-sign")
--- Оригинальные вкладки для кейсов (Tab8, Tab7, Tab6, Tab5, Tab3, Tab) удалены
 local Tab4 = Window:CreateTab("Halloween", "banknote") 
 local Tab2 = Window:CreateTab("Info", "book-text") 
 local Tab1 = Window:CreateTab("Credits", "creative-commons") 
@@ -179,7 +180,7 @@ Rayfield:Notify({
 -- !!! ВКЛАДКА AutoFarm (СМАРТ И МАНУАЛЬНЫЙ ФАРМ) !!!
 -- =========================================================================
 
--- 1. SMART AUTO-FARM GUI (Оригинальный код)
+-- 1. SMART AUTO-FARM GUI
 local LabelSmart = TabSmart:CreateLabel("Farm stars")
 TabSmart:CreateButton({
    Name = "Запустить AutoFarm Stars",
@@ -225,7 +226,7 @@ TabSmart:CreateDropdown({
     end,
 })
 
--- *** УНИФИЦИРОВАННЫЕ КНОПКИ МАНУАЛЬНОГО ФАРМА ***
+-- *** УНИФИЦИРОВАННЫЕ КНОПКИ МАНУАЛЬНОГО ФАРМА (Case Farm) ***
 -- runsToBreak - количество циклов, 1 цикл = 10 кейсов.
 TabSmart:CreateButton({ Name = "Фарм 1МЛН кейсов", Callback = function() runManualCaseFarm(100000) end, })
 TabSmart:CreateButton({ Name = "Фарм 100К кейсов", Callback = function() runManualCaseFarm(10000) end, })
