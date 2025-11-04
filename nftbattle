@@ -37,6 +37,10 @@ local VALID_CASES = {
     ["Trash"] = true,
 }
 
+-- !!! НОВЫЕ ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ДЛЯ ANTI-AFK !!!
+local antiAFKActive = false
+local antiAFKThread = nil
+
 -- =========================================================================
 -- !!! ФУНКЦИЯ ПОЛУЧЕНИЯ БАЛАНСА (НАДЕЖНАЯ) !!!
 -- =========================================================================
@@ -105,6 +109,23 @@ local function runSmartFarm()
 end
 
 -- =========================================================================
+-- !!! НОВАЯ ФУНКЦИЯ ANTI-AFK !!!
+-- =========================================================================
+local function runAntiAFK()
+    local player = game.Players.LocalPlayer
+    while antiAFKActive do
+        local character = player.Character
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        
+        if humanoid then
+            humanoid.Jump = true -- Заставляем персонажа прыгнуть
+        end
+        
+        wait(4) -- Ждем 4 секунды перед следующим прыжком
+    end
+end
+
+-- =========================================================================
 -- !!! ФУНКЦИЯ ДЛЯ МАНУАЛЬНОГО ФАРМА (Использует selectedCase и selectedRuns) !!!
 -- =========================================================================
 local function runManualCaseFarm()
@@ -115,8 +136,8 @@ local function runManualCaseFarm()
     -- Усиленная проверка
     if type(caseName) ~= "string" or not VALID_CASES[caseName] or type(runsToBreak) ~= "number" or runsToBreak < 1 then
         Rayfield:Notify({
-            Title = "Case Farm ОШИБКА", 
-            Content = "Некорректные настройки. Выберите Кейс и Количество.", 
+            Title = "Farm Case", 
+            Content = "Ты не правильно выбрал бездарь. Выбери уже кейс и количество.", 
             Duration = 4.0,
         })
         return
@@ -138,8 +159,8 @@ local function runManualCaseFarm()
     end
     
     Rayfield:Notify({
-        Title = "Case Farm",
-        Content = string.format("Завершено %d кейсов %s.", runsToBreak * 10, caseName),
+        Title = "Farm case",
+        Content = string.format("Ну я уже нафармил %d кейсов %s.", runsToBreak * 10, caseName),
         Duration = 3.0,
     })
 end
@@ -149,7 +170,7 @@ end
 -- !!! GUI НАСТРОЙКА !!!
 -- =========================================================================
 local Window = Rayfield:CreateWindow({
-   Name = "NFT BATTLE | MR HUB (t.me/minrteam) | 1.4",
+   Name = "NFT BATTLE | MR HUB (t.me/minrteam) | 1.7",
    Icon = 0, 
    LoadingTitle = "MR HUB (t.me/minrteam)",
    LoadingSubtitle = "By MineRoma Team",
@@ -251,7 +272,7 @@ TabCaseFarm:CreateButton({ Name = "1К кейсов (100 циклов)", Callbac
 TabCaseFarm:CreateButton({ Name = "100 кейсов (10 циклов)", Callback = createRunsSelectCallback(10) })
 TabCaseFarm:CreateButton({ Name = "10 кейсов (1 цикл)", Callback = createRunsSelectCallback(1) })
 
-TabCaseFarm:CreateLabel("---")
+TabCaseFarm:CreateLabel("")
 
 -- *** СЕКЦИЯ 3: ЗАПУСК ФАРМА ***
 TabCaseFarm:CreateButton({ 
@@ -270,7 +291,7 @@ TabCaseFarm:CreateButton({
 
 
 -- =========================================================================
--- !!! ВКЛАДКА AutoFarm Stars (ОРИГИНАЛЬНЫЙ КОД) !!!
+-- !!! ВКЛАДКА AutoFarm Stars (ОРИГИНАЛЬНЫЙ КОД + ANTI-AFK) !!!
 -- =========================================================================
 
 TabSmart:CreateLabel("Farm stars")
@@ -298,6 +319,26 @@ TabSmart:CreateButton({
             Rayfield:Notify({Title = "AutoFarm Stars", Content = "Что то тут не так... Бро ты его даже не запускал.", Duration = 2})
         end
    end,
+})
+
+---
+-- !!! НОВАЯ КНОПКА ANTI-AFK !!!
+TabSmart:CreateLabel("Полезные настройки для AutoFarm Stars")
+
+TabSmart:CreateToggle({
+    Name = "Anti-AFK",
+    Callback = function(state)
+        antiAFKActive = state
+        if state then
+            -- Если включено, запускаем поток
+            antiAFKThread = spawn(runAntiAFK)
+            Rayfield:Notify({Title = "Anti-Afk", Content = "Ну наверное тебя не кикнет за 20 минут афк (должно).", Duration = 3})
+        else
+            -- Если выключено, останавливаем поток (просто обнуляем, т.к. цикл сам завершится)
+            antiAFKThread = nil
+            Rayfield:Notify({Title = "Anti-Afk", Content = "Ну короче вроде анти афк выключен.", Duration = 2})
+        end
+    end,
 })
 
 -- =========================================================================
