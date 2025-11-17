@@ -29,7 +29,7 @@ local Window = Rayfield:CreateWindow({
 })
 
 -- Создание вкладок
-local MainTab = Window:CreateTab("Основные", 4483362458)
+local MainTab = Window:CreateTab("Без категории", 4483362458)
 local PlayerTab = Window:CreateTab("Игрок", 4483362458)
 local TeleportTab = Window:CreateTab("Телепорт", 4483362458)
 local SettingsTab = Window:CreateTab("Настройки", 4483362458)
@@ -120,7 +120,7 @@ local function ToggleAntiAFK()
             end
         end)
         Rayfield:Notify({
-            Title = "Анти-АФК",
+            Title = "ANTI AFK,
             Content = "Анти-АФК включен!",
             Duration = 3,
             Image = 4483362458,
@@ -131,8 +131,8 @@ local function ToggleAntiAFK()
             antiAFKConnection = nil
         end
         Rayfield:Notify({
-            Title = "Анти-АФК",
-            Content = "Анти-АФК выключен",
+            Title = "ANTI AFK",
+            Content = "Ты вырубил aAti Afk",
             Duration = 3,
             Image = 4483362458,
         })
@@ -179,7 +179,7 @@ local function TPToPlayer(targetPlayer)
     if not targetPlayer.Character then
         Rayfield:Notify({
             Title = "Ошибка",
-            Content = "У выбранного игрока нет персонажа!",
+            Content = "У чела нету хуманройда или характера!",
             Duration = 3,
             Image = 4483362458,
         })
@@ -195,8 +195,8 @@ local function TPToPlayer(targetPlayer)
     myRoot.CFrame = targetRoot.CFrame * offset
     
     Rayfield:Notify({
-        Title = "Телепортация",
-        Content = "Телепортирован к игроку: " .. targetPlayer.Name,
+        Title = "TP",
+        Content = "ТП К: " .. targetPlayer.Name,
         Duration = 3,
         Image = 4483362458,
     })
@@ -207,8 +207,8 @@ local function ResetCharacter()
     if player.Character then
         player.Character:BreakJoints()
         Rayfield:Notify({
-            Title = "Сброс",
-            Content = "Персонаж сброшен!",
+            Title = "Суицид",
+            Content = "Ты убил себя!",
             Duration = 3,
             Image = 4483362458,
         })
@@ -511,7 +511,7 @@ local function FlingAllPlayers()
     if not player.Character then 
         Rayfield:Notify({
             Title = "Ошибка",
-            Content = "Нет персонажа!",
+            Content = "Нема персонажа!",
             Duration = 3,
             Image = 4483362458,
         })
@@ -522,7 +522,7 @@ local function FlingAllPlayers()
     if not rootPart then 
         Rayfield:Notify({
             Title = "Ошибка",
-            Content = "Нет корневой части!",
+            Content = "Нема корня характера!",
             Duration = 3,
             Image = 4483362458,
         })
@@ -532,8 +532,8 @@ local function FlingAllPlayers()
     isFlinging = true
     
     Rayfield:Notify({
-        Title = "Флинг",
-        Content = "Начинаем флинг всех игроков...",
+        Title = "FLING",
+        Content = "Флинганём ка всех!",
         Duration = 3,
         Image = 4483362458,
     })
@@ -588,8 +588,8 @@ local function FlingAllPlayers()
         isFlinging = false
         
         Rayfield:Notify({
-            Title = "Флинг",
-            Content = "Флинг всех игроков завершен!",
+            Title = "FLING",
+            Content = "Я перестал флинговать 😊!",
             Duration = 3,
             Image = 4483362458,
         })
@@ -710,21 +710,21 @@ end
 local MainSection = MainTab:CreateSection("Основные функции")
 
 local FlingButton = MainTab:CreateButton({
-    Name = "Флинг всех игроков",
+    Name = "Fling всех",
     Callback = function()
         FlingAllPlayers()
     end,
 })
 
 local ResetButton = MainTab:CreateButton({
-    Name = "Сбросить персонажа",
+    Name = "Reset",
     Callback = function()
         ResetCharacter()
     end,
 })
 
 local LeaveButton = MainTab:CreateButton({
-    Name = "Покинуть игру",
+    Name = "Leave",
     Callback = function()
         LeaveGame()
     end,
@@ -760,7 +760,7 @@ local WalkFlingToggle = MainTab:CreateToggle({
 local PlayerSection = PlayerTab:CreateSection("Настройки игрока")
 
 local FlyToggle = PlayerTab:CreateToggle({
-    Name = "Полет",
+    Name = "Fly",
     CurrentValue = false,
     Flag = "FlyToggle",
     Callback = function(Value)
@@ -773,7 +773,7 @@ local FlyToggle = PlayerTab:CreateToggle({
 })
 
 local NoclipToggle = PlayerTab:CreateToggle({
-    Name = "Ноклип",
+    Name = "Noclip",
     CurrentValue = false,
     Flag = "NoclipToggle",
     Callback = function(Value)
@@ -786,7 +786,7 @@ local NoclipToggle = PlayerTab:CreateToggle({
 })
 
 local AntiAFKToggle = PlayerTab:CreateToggle({
-    Name = "Анти-АФК",
+    Name = "Anti-Afk",
     CurrentValue = false,
     Flag = "AntiAFKToggle",
     Callback = function(Value)
@@ -1019,5 +1019,3 @@ Rayfield:Notify({
     Duration = 6,
     Image = 4483362458,
 })
-
-print("🎉 Xeno Script с Rayfield загружен!")
