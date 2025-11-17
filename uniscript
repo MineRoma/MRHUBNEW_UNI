@@ -120,7 +120,7 @@ local function ToggleAntiAFK()
             end
         end)
         Rayfield:Notify({
-            Title = "ANTI AFK,
+            Title = "ANTI AFK",
             Content = "Анти-АФК включен!",
             Duration = 3,
             Image = 4483362458,
