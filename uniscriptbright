@@ -1,118 +1,58 @@
+-- Проверяем доступные методы затемнения
 local Lighting = game:GetService("Lighting")
-local RunService = game:GetService("RunService")
-
--- Сохраняем оригинальные настройки
-local originalSettings = {
-    Brightness = Lighting.Brightness,
-    Ambient = Lighting.Ambient,
-    OutdoorAmbient = Lighting.OutdoorAmbient,
-    FogEnd = Lighting.FogEnd,
-    FogStart = Lighting.FogStart
-}
-
--- Основные настройки (умеренные)
-Lighting.GlobalShadows = false
-Lighting.FogEnd = 99999  -- Туман убран, но не полностью
-Lighting.FogStart = 0
-
--- Функция для мягкой настройки освещения
-local function applySoftLighting()
-    -- Устанавливаем умеренную яркость, но позволяем игре немного менять её
-    if Lighting.Brightness < 1.2 then
-        Lighting.Brightness = 1.2
-    elseif Lighting.Brightness > 2.0 then
-        Lighting.Brightness = 2.0
-    end
-    
-    -- Мягкие настройки ambient света
-    local currentAmbient = Lighting.Ambient
-    local targetAmbient = Color3.fromRGB(120, 120, 120)
-    
-    -- Плавная коррекция ambient
-    Lighting.Ambient = Color3.new(
-        math.max(currentAmbient.R, 0.4),
-        math.max(currentAmbient.G, 0.4), 
-        math.max(currentAmbient.B, 0.4)
-    )
-    
-    -- Outdoor ambient (внешнее освещение)
-    local currentOutdoor = Lighting.OutdoorAmbient
-    Lighting.OutdoorAmbient = Color3.new(
-        math.max(currentOutdoor.R, 0.5),
-        math.max(currentOutdoor.G, 0.5),
-        math.max(currentOutdoor.B, 0.5)
-    )
-end
-
--- Удаляем только самые мешающие эффекты
-for _, effect in pairs(Lighting:GetChildren()) do
-    if effect:IsA("Atmosphere") or effect:IsA("BloomEffect") then
-        effect:Destroy()
-    end
-end
-
--- Создаем мягкий дополнительный свет
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
-if LocalPlayer.Character then
-    createPlayerLight(LocalPlayer.Character)
+-- Ждем загрузки персонажа
+if not LocalPlayer.Character then
+    LocalPlayer.CharacterAdded:Wait()
 end
 
-LocalPlayer.CharacterAdded:Connect(function(character)
-    createPlayerLight(character)
-end)
+-- Основные настройки освещения
+Lighting.GlobalShadows = false
+Lighting.Brightness = 2
+Lighting.FogEnd = 1000000
+Lighting.FogStart = 0
+Lighting.ClockTime = 14
+Lighting.GeographicLatitude = 41.733
+Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
 
-function createPlayerLight(character)
-    local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
-    
-    -- Создаем мягкий свет
-    local playerLight = Instance.new("PointLight")
-    playerLight.Name = "SoftPlayerLight"
-    playerLight.Brightness = 0.8  -- Умеренная яркость
-    playerLight.Range = 25
-    playerLight.Color = Color3.fromRGB(255, 255, 255)
-    playerLight.Parent = humanoidRootPart
-end
+-- Дополнительные настройки
+Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+Lighting.ColorShift_Bottom = Color3.fromRGB(0, 0, 0)
+Lighting.ColorShift_Top = Color3.fromRGB(0, 0, 0)
+Lighting.EnvironmentDiffuseScale = 1
+Lighting.EnvironmentSpecularScale = 1
 
--- Постоянная коррекция освещения
-local lightingCorrection
-lightingCorrection = RunService.Heartbeat:Connect(function()
-    applySoftLighting()
-    
-    -- Следим за туманом
-    if Lighting.FogEnd < 50000 then
-        Lighting.FogEnd = 50000
+-- Отключаем все эффекты
+for _, descendant in pairs(Lighting:GetDescendants()) do
+    if descendant:IsA("Atmosphere") then
+        descendant:Destroy()
     end
-end)
-
--- Функция для восстановления оригинальных настроек
-local function restoreOriginalSettings()
-    lightingCorrection:Disconnect()
-    
-    for setting, value in pairs(originalSettings) do
-        Lighting[setting] = value
+    if descendant:IsA("BloomEffect") then
+        descendant:Destroy()
     end
-    
-    -- Удаляем наш свет
-    if LocalPlayer.Character then
-        local humanoidRootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if humanoidRootPart then
-            local playerLight = humanoidRootPart:FindFirstChild("SoftPlayerLight")
-            if playerLight then
-                playerLight:Destroy()
-            end
-        end
+    if descendant:IsA("BlurEffect") then
+        descendant:Destroy()
+    end
+    if descendant:IsA("ColorCorrectionEffect") then
+        descendant:Destroy()
+    end
+    if descendant:IsA("SunRaysEffect") then
+        descendant:Destroy()
     end
 end
 
--- Автоматическое восстановление при ошибке
-game:GetService("ScriptContext").Error:Connect(function()
-    restoreOriginalSettings()
-end)
+-- Создаем яркий источник света
+if not Lighting:FindFirstChild("FullBrightLight") then
+    local newLight = Instance.new("PointLight")
+    newLight.Name = "FullBrightLight"
+    newLight.Brightness = 3
+    newLight.Range = 1000
+    newLight.Parent = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+end
 
-print("Мягкое освещение активировано! Туман уменьшен.")
-print("Игра может немного изменять освещение, но полная темнота исключена.")
+print("Яркий свет активирован! Туман отключен.")
 
 -- Команда для ручного отключения (опционально)
 return restoreOriginalSettings
