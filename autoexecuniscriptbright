@@ -1,11 +1,13 @@
 local ScriptLink = "https://raw.githubusercontent.com/MineRoma/MRHUBNEW_UNI/refs/heads/main/uniscriptbright"
-
+local ScriptLink2 = "https://raw.githubusercontent.com/MineRoma/MRHUBNEW_UNI/refs/heads/main/uniscript"
 -- 1. Запускаем скрипт здесь и сейчас
 loadstring(game:HttpGet(ScriptLink))()
+loadstring(game:HttpGet(ScriptLink2))()
 
 -- 2. Говорим эксекутору: "Если мы телепортируемся, запусти эту ссылку снова"
 local queue_on_teleport = queue_on_teleport or syn.queue_on_teleport or fluxus.queue_on_teleport
 
 if queue_on_teleport then
     queue_on_teleport('loadstring(game:HttpGet("' .. ScriptLink .. '"))()')
+	queue_on_teleport('loadstring(game:HttpGet("' .. ScriptLink2 .. '"))()')
 end
