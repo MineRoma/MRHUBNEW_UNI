@@ -1,0 +1,365 @@
+-- =========================================================================
+-- !!! ФИКС ЗАГРУЗКИ: УДАЛЕН ПРОБЛЕМНЫЙ ПАРАМЕТР ИЗ GET !!!
+-- =========================================================================
+local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/MineRoma/MRHUBNEW_UNI/refs/heads/main/guimod'))()
+
+-- =========================================================================
+-- !!! ГЛОБАЛЬНЫЕ НАСТРОЙКИ ФАРМА И ПЕРЕМЕННЫЕ GUI !!!
+-- =========================================================================
+local auto = 0
+local smartFarmActive = false 
+-- **ДВЕ ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ** для выбора
+selectedCase = "Gold" 
+selectedRuns = 1 -- По умолчанию фармим 10 Gold кейсов
+
+-- Цены на 10 кейсов 
+local CASE_PRICES = {
+    ["Gold"] = 19990, 
+    ["Manager"] = 8350,
+    ["Office Clerk"] = 6890,
+    ["Plodder"] = 4440,
+    ["Beggar"] = 2200,
+    ["Trash"] = 0, -- Trash всегда бесплатный
+}
+
+-- Приоритет кейсов
+local CASE_PRIORITY = {
+    "Gold", "Manager", "Office Clerk", "Plodder", "Beggar", "Trash"
+}
+
+-- Список допустимых кейсов
+local VALID_CASES = {
+    ["Gold"] = true,
+    ["Manager"] = true,
+    ["Office Clerk"] = true,
+    ["Plodder"] = true,
+    ["Beggar"] = true,
+    ["Trash"] = true,
+}
+
+-- !!! НОВЫЕ ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ДЛЯ ANTI-AFK !!!
+local antiAFKActive = false
+local antiAFKThread = nil
+
+-- =========================================================================
+-- !!! ФУНКЦИЯ ПОЛУЧЕНИЯ БАЛАНСА (НАДЕЖНАЯ) !!!
+-- =========================================================================
+local function getPlayerMoney()
+    local player = game.Players.LocalPlayer
+    local moneyValue = 0
+
+    local success, moneyObject = pcall(function()
+        return player.PlayerGui.MainGui.TopFrame.Balance.SubVal
+    end)
+    
+    if success and moneyObject then
+        local value = tonumber(moneyObject.Value)
+        if value ~= nil then
+            moneyValue = value
+        end
+    end
+
+    return moneyValue 
+end
+
+-- =========================================================================
+-- !!! ФУНКЦИЯ ОСНОВНОГО ЦИКЛА SMART FARM (С ЗАДЕРЖКОЙ 0.5) !!!
+-- =========================================================================
+local smartFarmThread = nil 
+local function runSmartFarm()
+    while smartFarmActive do
+        local currentMoney = getPlayerMoney()
+        local caseFound = false
+        
+        for _, caseName in ipairs(CASE_PRIORITY) do
+            local cost = CASE_PRICES[caseName]
+            
+            if currentMoney >= cost then
+                
+                local argsOpen = { caseName, 10 }
+                game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):InvokeServer(unpack(argsOpen))
+                
+                wait(0.5) 
+                
+                local argsSell = { "Sell", "ALL" }
+                game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("Inventory"):FireServer(unpack(argsSell))
+                
+                Rayfield:Notify({
+                   Title = "AutoFarm Stars", 
+                   Content = "Куплен кейс: "..caseName,
+                   Duration = 1.0,
+                })
+
+                caseFound = true
+                break 
+            end
+        end
+        
+        if not caseFound then
+            Rayfield:Notify({
+               Title = "AutoFarm Stars",
+               Content = "Нищита у тебя даже нет денег на begger!. Ну всё жди 3 секунды.",
+               Duration = 3.0,
+            })
+            wait(3) 
+        else
+            wait(1.5)
+        end
+    end
+end
+
+-- =========================================================================
+-- !!! НОВАЯ ФУНКЦИЯ ANTI-AFK !!!
+-- =========================================================================
+local function runAntiAFK()
+    local player = game.Players.LocalPlayer
+    while antiAFKActive do
+        local character = player.Character
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        
+        if humanoid then
+            humanoid.Jump = true -- Заставляем персонажа прыгнуть
+        end
+        
+        wait(4) -- Ждем 4 секунды перед следующим прыжком
+    end
+end
+
+-- =========================================================================
+-- !!! ФУНКЦИЯ ДЛЯ МАНУАЛЬНОГО ФАРМА (Использует selectedCase и selectedRuns) !!!
+-- =========================================================================
+local function runManualCaseFarm()
+    auto = 0
+    local runsToBreak = selectedRuns
+    local caseName = selectedCase
+    
+    -- Усиленная проверка
+    if type(caseName) ~= "string" or not VALID_CASES[caseName] or type(runsToBreak) ~= "number" or runsToBreak < 1 then
+        Rayfield:Notify({
+            Title = "Farm Case", 
+            Content = "Ты не правильно выбрал бездарь. Выбери уже кейс и количество.", 
+            Duration = 4.0,
+        })
+        return
+    end
+
+    -- runsToBreak - это количество циклов, каждый цикл открывает 10 кейсов.
+    while true do
+        local argsOpen = { caseName, 10 }
+        game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):InvokeServer(unpack(argsOpen))
+        
+        wait(0.5) 
+        
+        local argsSell = { "Sell", "ALL" }
+        game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("Inventory"):FireServer(unpack(argsSell))
+        
+        wait(1)
+        auto += 1
+        if auto == runsToBreak then auto = 0; break end
+    end
+    
+    Rayfield:Notify({
+        Title = "Farm case",
+        Content = string.format("Ну я уже нафармил %d кейсов %s.", runsToBreak * 10, caseName),
+        Duration = 3.0,
+    })
+end
+
+
+-- =========================================================================
+-- !!! GUI НАСТРОЙКА !!!
+-- =========================================================================
+local Window = Rayfield:CreateWindow({
+   Name = "NFT BATTLE | MR HUB (t.me/minrteam) | 1.7",
+   Icon = 0, 
+   LoadingTitle = "MR HUB (t.me/minrteam)",
+   LoadingSubtitle = "By MineRoma Team",
+   ShowText = "MR HUB",
+   Theme = "Amethyst", 
+   ToggleUIKeybind = "P", 
+   DisableRayfieldPrompts = false,
+   DisableBuildWarnings = false, 
+   ConfigurationSaving = {
+      Enabled = false,
+      FolderName = nil, 
+      FileName = "Big Hub"
+   },
+   Discord = {
+      Enabled = false, 
+      Invite = "noinvitelink", 
+      RememberJoins = true 
+   },
+   KeySystem = true, 
+   KeySettings = {
+      Title = "Key System",
+      Subtitle = "@minrteam",
+      Note = "Ключ @minrteam и писать создателю", 
+      FileName = "BetaKey", 
+      SaveKey = true, 
+      GrabKeyFromSite = false, 
+      Key = {"BetaDev"} 
+   }
+})
+
+-- =========================================================================
+-- !!! СОЗДАНИЕ ВКЛАДОК (Теперь 3 вкладки) !!!
+-- =========================================================================
+local TabSmart = Window:CreateTab("AutoFarm Stars", "dollar-sign")
+local TabCaseFarm = Window:CreateTab("Farm case", "box")
+local Tab2 = Window:CreateTab("Info", "book-text") 
+local Tab1 = Window:CreateTab("Credits", "creative-commons") 
+
+Rayfield:Notify({
+   Title = "ВНИМАНИЕ",
+   Content = "Возможны баги",
+   Duration = 6.5,
+   Image = "x",
+})
+
+-- =========================================================================
+-- !!! ВКЛАДКА Case Farm 📦 (КНОПКИ) !!!
+-- =========================================================================
+local currentStatusLabel = TabCaseFarm:CreateLabel(string.format("Ты выбрал фарм: кейс: %s | циклов: %d", selectedCase, selectedRuns))
+
+-- *** Функция обновления статуса ***
+local function updateStatusLabel()
+    currentStatusLabel:Set(string.format("Ты выбрал фарм: кейс: %s | циклов: %d", selectedCase, selectedRuns))
+end
+
+-- *** СЕКЦИЯ 1: ВЫБОР КЕЙСА ***
+TabCaseFarm:CreateLabel("Выбери кейс который хочешь фармить:")
+
+local function createCaseSelectCallback(caseName)
+    return function()
+        local success, err = pcall(function()
+            selectedCase = caseName
+            updateStatusLabel()
+            Rayfield:Notify({Title = "Farm case: ", Content = "А ты знал что ты выбрал кейс: "..caseName, Duration = 2.0})
+        end)
+        if not success then Rayfield:Notify({Title = "Farm case ОШИБКА", Content = "ДА ЁМАЁ, сбой при выборе кейса: "..tostring(err), Duration = 3.0}) end
+    end
+end
+
+TabCaseFarm:CreateButton({ Name = "Gold", Callback = createCaseSelectCallback("Gold") })
+TabCaseFarm:CreateButton({ Name = "Manager", Callback = createCaseSelectCallback("Manager") })
+TabCaseFarm:CreateButton({ Name = "Office Clerk", Callback = createCaseSelectCallback("Office Clerk") })
+TabCaseFarm:CreateButton({ Name = "Plodder", Callback = createCaseSelectCallback("Plodder") })
+TabCaseFarm:CreateButton({ Name = "Beggar", Callback = createCaseSelectCallback("Beggar") })
+TabCaseFarm:CreateButton({ Name = "Trash", Callback = createCaseSelectCallback("Trash") })
+
+
+-- TabCaseFarm:CreateLabel("---")
+
+-- *** СЕКЦИЯ 2: ВЫБОР КОЛИЧЕСТВА И ЗАПУСК ***
+TabCaseFarm:CreateLabel("Выберай количества фарма кейсов:")
+
+local function createRunsSelectCallback(runs)
+    return function()
+        local success, err = pcall(function()
+            selectedRuns = runs
+            updateStatusLabel()
+            Rayfield:Notify({Title = "Case Farm Выбор", Content = string.format("Бро, ты выбрал %d циклов (%d кейсов)", runs, runs * 10), Duration = 2.0})
+        end)
+        if not success then Rayfield:Notify({Title = "Case Farm ОШИБКА", Content = "Ну блять, ошибка при выборе количества фарма: "..tostring(err), Duration = 3.0}) end
+    end
+end
+
+TabCaseFarm:CreateButton({ Name = "1МЛН кейсов (100000 циклов)", Callback = createRunsSelectCallback(100000) })
+TabCaseFarm:CreateButton({ Name = "100К кейсов (10000 циклов)", Callback = createRunsSelectCallback(10000) })
+TabCaseFarm:CreateButton({ Name = "10К кейсов (1000 циклов)", Callback = createRunsSelectCallback(1000) })
+TabCaseFarm:CreateButton({ Name = "1К кейсов (100 циклов)", Callback = createRunsSelectCallback(100) })
+TabCaseFarm:CreateButton({ Name = "100 кейсов (10 циклов)", Callback = createRunsSelectCallback(10) })
+TabCaseFarm:CreateButton({ Name = "10 кейсов (1 цикл)", Callback = createRunsSelectCallback(1) })
+
+TabCaseFarm:CreateLabel("")
+
+-- *** СЕКЦИЯ 3: ЗАПУСК ФАРМА ***
+TabCaseFarm:CreateButton({ 
+    Name = "<_> Start Farm Case <_>", 
+    Callback = function()
+        local success, err = pcall(runManualCaseFarm)
+        if not success then
+             Rayfield:Notify({
+                Title = "КРИТИЧЕСКАЯ ОШИБКА ФАРМА", 
+                Content = "Ну короче ошибка при запуске: "..tostring(err),
+                Duration = 5.0,
+             })
+        end
+    end
+})
+
+
+-- =========================================================================
+-- !!! ВКЛАДКА AutoFarm Stars (ОРИГИНАЛЬНЫЙ КОД + ANTI-AFK) !!!
+-- =========================================================================
+
+TabSmart:CreateLabel("Farm stars")
+TabSmart:CreateButton({
+   Name = "Запустить AutoFarm Stars",
+   Callback = function()
+       if not smartFarmActive then
+            smartFarmActive = true
+            Rayfield:Notify({Title = "AutoFarm Stars", Content = "AutoFarm Stars запущен! Стараюсь быть не бездарем и фармить нормально.", Duration = 3})
+            smartFarmThread = spawn(runSmartFarm) 
+        else
+            Rayfield:Notify({Title = "AutoFarm Stars", Content = "AutoFarm Stars был уже запущен! Дурачело.", Duration = 2})
+        end
+   end,
+})
+
+TabSmart:CreateButton({
+   Name = "Остановить AutoFarm Stars",
+   Callback = function()
+        if smartFarmActive then
+            smartFarmActive = false
+            Rayfield:Notify({Title = "AutoFarm Stars", Content = "AutoFarm Stars остановлен :(.", Duration = 2})
+            smartFarmThread = nil
+        else
+            Rayfield:Notify({Title = "AutoFarm Stars", Content = "Что то тут не так... Бро ты его даже не запускал.", Duration = 2})
+        end
+   end,
+})
+
+---
+-- !!! НОВАЯ КНОПКА ANTI-AFK !!!
+TabSmart:CreateLabel("Полезные настройки для AutoFarm Stars")
+
+TabSmart:CreateToggle({
+    Name = "Anti-AFK",
+    Callback = function(state)
+        antiAFKActive = state
+        if state then
+            -- Если включено, запускаем поток
+            antiAFKThread = spawn(runAntiAFK)
+            Rayfield:Notify({Title = "Anti-Afk", Content = "Ну наверное тебя не кикнет за 20 минут афк (должно).", Duration = 3})
+        else
+            -- Если выключено, останавливаем поток (просто обнуляем, т.к. цикл сам завершится)
+            antiAFKThread = nil
+            Rayfield:Notify({Title = "Anti-Afk", Content = "Ну короче вроде анти афк выключен.", Duration = 2})
+        end
+    end,
+})
+
+-- =========================================================================
+-- !!! CREDITS (Оригинальный код) !!!
+-- =========================================================================
+local Label = Tab1:CreateLabel("Кодер: mineroma_off")
+local Label = Tab1:CreateLabel("Тестер: mineroma_off, Kiril74939")
+local Label = Tab1:CreateLabel("Моральная поддержка: mineroma_off")
+
+-- =========================================================================
+-- !!! INFO (Оригинальный код) !!!
+-- =========================================================================
+local Label = Tab2:CreateLabel("Проводились тесты на: Delta (android)")
+local Label = Tab2:CreateLabel("Проводились тесты на: Krnl (android)")
+local Label = Tab2:CreateLabel("Проводились тесты на: Xeno (pc)")
+local Label = Tab2:CreateLabel("Функции некоторые были спизжены, ну немножко кроме автофарма звёзд")
+local Label = Tab2:CreateLabel("Хотите поддержать? Подпишись на тгк @minrteam")
+local Label = Tab2:CreateLabel("")
+local Label = Tab2:CreateLabel("С любовью от команды MineRoma Team")
+local Button = Tab2:CreateButton({
+   Name = "Полностью закрыть GUI",
+   Callback = function()
+   Rayfield:Destroy()
+   end,
+})
