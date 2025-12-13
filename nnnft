@@ -4,30 +4,33 @@
 local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/MineRoma/MRHUBNEW_UNI/refs/heads/main/guimod'))()
 
 -- =========================================================================
+-- !!! СЕРВИСЫ !!!
+-- =========================================================================
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
+
+-- =========================================================================
 -- !!! ГЛОБАЛЬНЫЕ НАСТРОЙКИ ФАРМА И ПЕРЕМЕННЫЕ GUI !!!
 -- =========================================================================
 local auto = 0
 local smartFarmActive = false 
--- **ДВЕ ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ** для выбора
 selectedCase = "Gold" 
-selectedRuns = 1 -- По умолчанию фармим 10 Gold кейсов
+selectedRuns = 1
 
--- Цены на 10 кейсов 
 local CASE_PRICES = {
     ["Gold"] = 19990, 
     ["Manager"] = 8350,
     ["Office Clerk"] = 6890,
     ["Plodder"] = 4440,
     ["Beggar"] = 2200,
-    ["Trash"] = 0, -- Trash всегда бесплатный
+    ["Trash"] = 0,
 }
 
--- Приоритет кейсов
 local CASE_PRIORITY = {
     "Gold", "Manager", "Office Clerk", "Plodder", "Beggar", "Trash"
 }
 
--- Список допустимых кейсов
 local VALID_CASES = {
     ["Gold"] = true,
     ["Manager"] = true,
@@ -37,9 +40,93 @@ local VALID_CASES = {
     ["Trash"] = true,
 }
 
--- !!! НОВЫЕ ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ДЛЯ ANTI-AFK !!!
 local antiAFKActive = false
 local antiAFKThread = nil
+
+-- =========================================================================
+-- !!! ПЕРЕМЕННЫЕ ДЛЯ ROCKET LIMIT !!!
+-- =========================================================================
+local rocketLimitActive = false
+local rocketTargetMult = 1.15
+local rocketThread = nil
+local rocketDetected = false
+
+-- =========================================================================
+-- !!! ПЕРЕМЕННЫЕ ДЛЯ AUTO EXECUTION !!!
+-- =========================================================================
+local autoExecEnabled = false
+local SCRIPT_URL = "https://raw.githubusercontent.com/MineRoma/MRHUBNEW_UNI/refs/heads/main/nftbattle"
+
+-- =========================================================================
+-- !!! ФУНКЦИЯ ПРОВЕРКИ РЕЖИМА ROCKET !!!
+-- =========================================================================
+local function checkRocketMode()
+    local Player = Players.LocalPlayer
+    local PlayerGui = Player:FindFirstChild("PlayerGui")
+    
+    if not PlayerGui then
+        return false, "PlayerGui не найден"
+    end
+    
+    local MainGui = PlayerGui:FindFirstChild("MainGui")
+    if not MainGui then
+        return false, "MainGui не найден"
+    end
+    
+    local Pages = MainGui:FindFirstChild("Pages")
+    if not Pages then
+        return false, "Pages не найден"
+    end
+    
+    local RocketPage = Pages:FindFirstChild("Rocket")
+    if not RocketPage then
+        return false, "Режим Rocket не существует в этой игре"
+    end
+    
+    local MainFrame = RocketPage:FindFirstChild("MainFrame")
+    if not MainFrame then
+        return false, "MainFrame не найден"
+    end
+    
+    local RocketFrame = MainFrame:FindFirstChild("RocketFrame")
+    local MultiplierLabel = MainFrame:FindFirstChild("Multiplier")
+    
+    if not RocketFrame or not MultiplierLabel then
+        return false, "Элементы Rocket не найдены"
+    end
+    
+    -- Проверяем видимость
+    if RocketPage.Visible then
+        return true, "Rocket активен и открыт ✅"
+    else
+        return true, "Rocket найден, но не открыт (открой вкладку Rocket в игре)"
+    end
+end
+
+-- =========================================================================
+-- !!! ФУНКЦИЯ QUEUE ON TELEPORT !!!
+-- =========================================================================
+local function setupAutoExec()
+    if autoExecEnabled then
+        local scriptCode = 'loadstring(game:HttpGet("' .. SCRIPT_URL .. '"))()'
+        
+        if queue_on_teleport then
+            queue_on_teleport(scriptCode)
+            return true
+        elseif syn and syn.queue_on_teleport then
+            syn.queue_on_teleport(scriptCode)
+            return true
+        elseif fluxus and fluxus.queue_on_teleport then
+            fluxus.queue_on_teleport(scriptCode)
+            return true
+        elseif getgenv().queue_on_teleport then
+            getgenv().queue_on_teleport(scriptCode)
+            return true
+        end
+        return false
+    end
+    return false
+end
 
 -- =========================================================================
 -- !!! ФУНКЦИЯ ПОЛУЧЕНИЯ БАЛАНСА (НАДЕЖНАЯ) !!!
@@ -60,6 +147,107 @@ local function getPlayerMoney()
     end
 
     return moneyValue 
+end
+
+-- =========================================================================
+-- !!! ФУНКЦИЯ ROCKET LIMIT !!!
+-- =========================================================================
+local function runRocketLimit()
+    local Player = Players.LocalPlayer
+    local PlayerGui = Player:WaitForChild("PlayerGui")
+    
+    local success, err = pcall(function()
+        local Pages = PlayerGui:WaitForChild("MainGui", 10):WaitForChild("Pages", 10)
+        local RocketPage = Pages:WaitForChild("Rocket", 10)
+        local MainFrame = RocketPage:WaitForChild("MainFrame", 10)
+        local RocketFrame = MainFrame:WaitForChild("RocketFrame", 10)
+        local MultiplierLabel = MainFrame:WaitForChild("Multiplier", 10)
+        local GiftImage = RocketFrame:WaitForChild("GiftImage", 10)
+        
+        local RocketRemote = ReplicatedStorage:WaitForChild("Events", 10):WaitForChild("Rocket", 10)
+        
+        local function getPrizeName()
+            for _, v in pairs(RocketFrame:GetChildren()) do
+                if v:IsA("ImageLabel") and v.Visible and v.Name ~= "GiftImage" then
+                    return v.Name
+                end
+            end
+            return GiftImage.Name
+        end
+        
+        Rayfield:Notify({
+            Title = "Rocket Limit",
+            Content = "🚀 Слежка за множителем запущена. Цель: x" .. rocketTargetMult,
+            Duration = 3.0,
+        })
+        
+        while rocketLimitActive do
+            local text = MultiplierLabel.Text
+            local mult = tonumber(text:match("x([%d%.]+)"))
+            
+            if mult then
+                if mult >= rocketTargetMult then
+                    local prize = getPrizeName()
+                    
+                    Rayfield:Notify({
+                        Title = "Rocket Limit",
+                        Content = "✅ Приз достиг x" .. mult .. " → забираем: " .. prize,
+                        Duration = 2.0,
+                    })
+                    
+                    pcall(function()
+                        RocketRemote:InvokeServer(prize, "Claim")
+                    end)
+                    
+                    task.wait(0.15)
+                    
+                    if autoExecEnabled then
+                        local queued = setupAutoExec()
+                        if queued then
+                            Rayfield:Notify({
+                                Title = "AutoExecution",
+                                Content = "📦 Скрипт поставлен в очередь на телепорт!",
+                                Duration = 2.0,
+                            })
+                        end
+                    end
+                    
+                    local placeId = game.PlaceId
+                    Rayfield:Notify({
+                        Title = "Rocket Limit",
+                        Content = "🔁 Выполняем реконнект...",
+                        Duration = 2.0,
+                    })
+                    
+                    pcall(function()
+                        TeleportService:Teleport(placeId, Player)
+                    end)
+                    
+                    task.wait(10)
+                end
+                
+                if mult <= 1.00 and text ~= "x1.00" then
+                    Rayfield:Notify({
+                        Title = "Rocket Limit",
+                        Content = "💥 Раунд проигран. Ждём новый старт...",
+                        Duration = 2.0,
+                    })
+                    task.wait(4)
+                end
+            end
+            
+            task.wait(0.2)
+        end
+    end)
+    
+    if not success then
+        Rayfield:Notify({
+            Title = "Rocket Limit",
+            Content = "❌ Ошибка: " .. tostring(err) .. "\nВозможно ты не в режиме Rocket!",
+            Duration = 5.0,
+        })
+        rocketLimitActive = false
+    end
 end
 
 -- =========================================================================
@@ -109,7 +297,7 @@ local function runSmartFarm()
 end
 
 -- =========================================================================
--- !!! НОВАЯ ФУНКЦИЯ ANTI-AFK !!!
+-- !!! ФУНКЦИЯ ANTI-AFK !!!
 -- =========================================================================
 local function runAntiAFK()
     local player = game.Players.LocalPlayer
@@ -118,22 +306,21 @@ local function runAntiAFK()
         local humanoid = character and character:FindFirstChildOfClass("Humanoid")
         
         if humanoid then
-            humanoid.Jump = true -- Заставляем персонажа прыгнуть
+            humanoid.Jump = true
         end
         
-        wait(4) -- Ждем 4 секунды перед следующим прыжком
+        wait(4)
     end
 end
 
 -- =========================================================================
--- !!! ФУНКЦИЯ ДЛЯ МАНУАЛЬНОГО ФАРМА (Использует selectedCase и selectedRuns) !!!
+-- !!! ФУНКЦИЯ ДЛЯ МАНУАЛЬНОГО ФАРМА !!!
 -- =========================================================================
 local function runManualCaseFarm()
     auto = 0
     local runsToBreak = selectedRuns
     local caseName = selectedCase
     
-    -- Усиленная проверка
     if type(caseName) ~= "string" or not VALID_CASES[caseName] or type(runsToBreak) ~= "number" or runsToBreak < 1 then
         Rayfield:Notify({
             Title = "Farm Case", 
@@ -143,7 +330,6 @@ local function runManualCaseFarm()
         return
     end
 
-    -- runsToBreak - это количество циклов, каждый цикл открывает 10 кейсов.
     while true do
         local argsOpen = { caseName, 10 }
         game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OpenCase"):InvokeServer(unpack(argsOpen))
@@ -170,7 +356,7 @@ end
 -- !!! GUI НАСТРОЙКА !!!
 -- =========================================================================
 local Window = Rayfield:CreateWindow({
-   Name = "NFT BATTLE | MR HUB (t.me/minrteam) | 1.7",
+   Name = "NFT BATTLE | MR HUB (t.me/minrteam) | 1.8",
    Icon = 0, 
    LoadingTitle = "MR HUB (t.me/minrteam)",
    LoadingSubtitle = "By MineRoma Team",
@@ -201,11 +387,10 @@ local Window = Rayfield:CreateWindow({
    }
 })
 
--- =========================================================================
--- !!! СОЗДАНИЕ ВКЛАДОК (Теперь 3 вкладки) !!!
--- =========================================================================
 local TabSmart = Window:CreateTab("AutoFarm Stars", "dollar-sign")
 local TabCaseFarm = Window:CreateTab("Farm case", "box")
+local TabRocket = Window:CreateTab("Rocket Limit", "rocket")
+local TabSettings = Window:CreateTab("Settings", "settings")
 local Tab2 = Window:CreateTab("Info", "book-text") 
 local Tab1 = Window:CreateTab("Credits", "creative-commons") 
 
@@ -217,16 +402,214 @@ Rayfield:Notify({
 })
 
 -- =========================================================================
--- !!! ВКЛАДКА Case Farm 📦 (КНОПКИ) !!!
+-- !!! ВКЛАДКА Rocket Limit 🚀 !!!
+-- =========================================================================
+TabRocket:CreateLabel("🚀 Настройка лимита Rocket")
+
+-- Статус Rocket режима
+local rocketModeLabel = TabRocket:CreateLabel("🔍 Статус: Проверка...")
+
+-- Проверяем режим при загрузке
+task.spawn(function()
+    task.wait(1)
+    local found, message = checkRocketMode()
+    rocketDetected = found
+    if found then
+        rocketModeLabel:Set("🟢 " .. message)
+        Rayfield:Notify({
+            Title = "Rocket Limit",
+            Content = "🚀 Увидел то что ты зашёл в ракетку! Теперь смело можешь ставить лимит.",
+            Duration = 3.0,
+        })
+    else
+        rocketModeLabel:Set("🔴 " .. message)
+        Rayfield:Notify({
+            Title = "Rocket Limit",
+            Content = "❌ " .. message,
+            Duration = 3.0,
+        })
+    end
+end)
+
+TabRocket:CreateButton({
+    Name = "🔄 Проверить режим Rocket",
+    Callback = function()
+        local found, message = checkRocketMode()
+        rocketDetected = found
+        if found then
+            rocketModeLabel:Set("🟢 " .. message)
+            Rayfield:Notify({
+                Title = "Rocket Limit",
+                Content = "🚀 " .. message,
+                Duration = 3.0,
+            })
+        else
+            rocketModeLabel:Set("🔴 " .. message)
+            Rayfield:Notify({
+                Title = "Rocket Limit",
+                Content = "❌ " .. message,
+                Duration = 3.0,
+            })
+        end
+    end,
+})
+
+TabRocket:CreateLabel("")
+TabRocket:CreateLabel("Введи множитель при котором забрать приз:")
+
+local rocketStatusLabel = TabRocket:CreateLabel("Текущий лимит: x" .. rocketTargetMult .. " | Статус: Выключен")
+
+local function updateRocketStatus()
+    local status = rocketLimitActive and "Включен ✅" or "Выключен ❌"
+    rocketStatusLabel:Set("Текущий лимит: x" .. rocketTargetMult .. " | Статус: " .. status)
+end
+
+TabRocket:CreateInput({
+    Name = "Множитель (минимум 1.01)",
+    PlaceholderText = "1.15",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(Text)
+        local num = tonumber(Text)
+        if num and num >= 1.01 then
+            rocketTargetMult = num
+            updateRocketStatus()
+            Rayfield:Notify({
+                Title = "Rocket Limit",
+                Content = "Установлен лимит: x" .. num,
+                Duration = 2.0,
+            })
+        else
+            Rayfield:Notify({
+                Title = "Rocket Limit",
+                Content = "Ошибка! Введи число не менее 1.01",
+                Duration = 2.0,
+            })
+        end
+    end,
+})
+
+TabRocket:CreateButton({
+    Name = "🎯 Поставить лимит",
+    Callback = function()
+        -- Сначала проверяем режим
+        local found, message = checkRocketMode()
+        rocketDetected = found
+        rocketModeLabel:Set(found and ("🟢 " .. message) or ("🔴 " .. message))
+        
+        if not found then
+            Rayfield:Notify({
+                Title = "Rocket Limit",
+                Content = "❌ " .. message .. "\nДля начала зайти в Rocket!",
+                Duration = 4.0,
+            })
+            return
+        end
+        
+        if not rocketLimitActive then
+            if rocketTargetMult >= 1.01 then
+                rocketLimitActive = true
+                updateRocketStatus()
+                rocketThread = task.spawn(runRocketLimit)
+                Rayfield:Notify({
+                    Title = "Rocket Limit",
+                    Content = "✅ Лимит x" .. rocketTargetMult .. " успешно активирован!",
+                    Duration = 2.0,
+                })
+            else
+                Rayfield:Notify({
+                    Title = "Rocket Limit",
+                    Content = "Введи для начала лимит множителя (минимум 1.01)!",
+                    Duration = 2.0,
+                })
+            end
+        else
+            Rayfield:Notify({
+                Title = "Rocket Limit",
+                Content = "Лимит как бы уже активен, чтобы сменить просто отключи лимит.",
+                Duration = 2.0,
+            })
+        end
+    end,
+})
+
+TabRocket:CreateButton({
+    Name = "⛔ Отключить лимит -_-",
+    Callback = function()
+        if rocketLimitActive then
+            rocketLimitActive = false
+            rocketThread = nil
+            updateRocketStatus()
+            Rayfield:Notify({
+                Title = "Rocket Limit",
+                Content = "Успешно отключил лимит. 0_0",
+                Duration = 2.0,
+            })
+        else
+            Rayfield:Notify({
+                Title = "Rocket Limit",
+                Content = "Ты не активировал лимит. -_-",
+                Duration = 2.0,
+            })
+        end
+    end,
+})
+
+TabRocket:CreateLabel("")
+TabRocket:CreateLabel("⚠️ После когда лимит будет чуть привышен будет перезаход.")
+
+-- =========================================================================
+-- !!! ВКЛАДКА Settings ⚙️ !!!
+-- =========================================================================
+TabSettings:CreateLabel("⚙️ Настройки скрипта")
+
+TabSettings:CreateToggle({
+    Name = "AutoExec (BETA)",
+    CurrentValue = false,
+    Flag = "AutoExecToggle",
+    Callback = function(state)
+        autoExecEnabled = state
+        
+        if state then
+            local supported = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport) or (getgenv().queue_on_teleport)
+            
+            if supported then
+                setupAutoExec()
+                Rayfield:Notify({
+                    Title = "AutoExec",
+                    Content = "✅ Успешно включил AutoExec.",
+                    Duration = 4.0,
+                })
+            else
+                Rayfield:Notify({
+                    Title = "AutoExec",
+                    Content = "❌ У тебя инжектор не поддерживает queue_on_teleport, поэтому эта функция не будет работать!",
+                    Duration = 4.0,
+                })
+                autoExecEnabled = false
+            end
+        else
+            Rayfield:Notify({
+                Title = "AutoExec",
+                Content = "❌ AutoExec отключён.",
+                Duration = 2.0,
+            })
+        end
+    end,
+})
+
+TabSettings:CreateLabel("")
+TabSettings:CreateLabel("ℹ️ AutoExec Автоматически запускает скрипт при перезаходе")
+TabSettings:CreateLabel("Работает с: Delta, Synapse, Fluxus, KRNL, Xeno (наверное)")
+
+-- =========================================================================
+-- !!! ВКЛАДКА Case Farm 📦 !!!
 -- =========================================================================
 local currentStatusLabel = TabCaseFarm:CreateLabel(string.format("Ты выбрал фарм: кейс: %s | циклов: %d", selectedCase, selectedRuns))
 
--- *** Функция обновления статуса ***
 local function updateStatusLabel()
     currentStatusLabel:Set(string.format("Ты выбрал фарм: кейс: %s | циклов: %d", selectedCase, selectedRuns))
 end
 
--- *** СЕКЦИЯ 1: ВЫБОР КЕЙСА ***
 TabCaseFarm:CreateLabel("Выбери кейс который хочешь фармить:")
 
 local function createCaseSelectCallback(caseName)
@@ -247,10 +630,6 @@ TabCaseFarm:CreateButton({ Name = "Plodder", Callback = createCaseSelectCallback
 TabCaseFarm:CreateButton({ Name = "Beggar", Callback = createCaseSelectCallback("Beggar") })
 TabCaseFarm:CreateButton({ Name = "Trash", Callback = createCaseSelectCallback("Trash") })
 
-
--- TabCaseFarm:CreateLabel("---")
-
--- *** СЕКЦИЯ 2: ВЫБОР КОЛИЧЕСТВА И ЗАПУСК ***
 TabCaseFarm:CreateLabel("Выберай количества фарма кейсов:")
 
 local function createRunsSelectCallback(runs)
@@ -273,7 +652,6 @@ TabCaseFarm:CreateButton({ Name = "10 кейсов (1 цикл)", Callback = cre
 
 TabCaseFarm:CreateLabel("")
 
--- *** СЕКЦИЯ 3: ЗАПУСК ФАРМА ***
 TabCaseFarm:CreateButton({ 
     Name = "<_> Start Farm Case <_>", 
     Callback = function()
@@ -288,9 +666,8 @@ TabCaseFarm:CreateButton({
     end
 })
 
-
 -- =========================================================================
--- !!! ВКЛАДКА AutoFarm Stars (ОРИГИНАЛЬНЫЙ КОД + ANTI-AFK) !!!
+-- !!! ВКЛАДКА AutoFarm Stars !!!
 -- =========================================================================
 
 TabSmart:CreateLabel("Farm stars")
@@ -320,8 +697,6 @@ TabSmart:CreateButton({
    end,
 })
 
----
--- !!! НОВАЯ КНОПКА ANTI-AFK !!!
 TabSmart:CreateLabel("Полезные настройки для AutoFarm Stars")
 
 TabSmart:CreateToggle({
@@ -329,11 +704,9 @@ TabSmart:CreateToggle({
     Callback = function(state)
         antiAFKActive = state
         if state then
-            -- Если включено, запускаем поток
             antiAFKThread = spawn(runAntiAFK)
             Rayfield:Notify({Title = "Anti-Afk", Content = "Ну наверное тебя не кикнет за 20 минут афк (должно).", Duration = 3})
         else
-            -- Если выключено, останавливаем поток (просто обнуляем, т.к. цикл сам завершится)
             antiAFKThread = nil
             Rayfield:Notify({Title = "Anti-Afk", Content = "Ну короче вроде анти афк выключен.", Duration = 2})
         end
@@ -341,19 +714,19 @@ TabSmart:CreateToggle({
 })
 
 -- =========================================================================
--- !!! CREDITS (Оригинальный код) !!!
+-- !!! CREDITS !!!
 -- =========================================================================
 local Label = Tab1:CreateLabel("Кодер: mineroma_off")
 local Label = Tab1:CreateLabel("Тестер: mineroma_off, Kiril74939")
 local Label = Tab1:CreateLabel("Моральная поддержка: mineroma_off")
 
 -- =========================================================================
--- !!! INFO (Оригинальный код) !!!
+-- !!! INFO !!!
 -- =========================================================================
 local Label = Tab2:CreateLabel("Проводились тесты на: Delta (android)")
 local Label = Tab2:CreateLabel("Проводились тесты на: Krnl (android)")
 local Label = Tab2:CreateLabel("Проводились тесты на: Xeno (pc)")
-local Label = Tab2:CreateLabel("Функции некоторые были спизжены, ну немножко кроме автофарма звёзд")
+local Label = Tab2:CreateLabel("Функции некоторые функции были взяты из других скриптов, ну немножко кроме автофарма звёзд")
 local Label = Tab2:CreateLabel("Хотите поддержать? Подпишись на тгк @minrteam")
 local Label = Tab2:CreateLabel("")
 local Label = Tab2:CreateLabel("С любовью от команды MineRoma Team")
