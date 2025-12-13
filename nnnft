@@ -356,7 +356,7 @@ end
 -- !!! GUI НАСТРОЙКА !!!
 -- =========================================================================
 local Window = Rayfield:CreateWindow({
-   Name = "NFT BATTLE | MR HUB (t.me/minrteam) | 1.8",
+   Name = "NFT BATTLE | MR HUB (t.me/minrteam) | 1.9",
    Icon = 0, 
    LoadingTitle = "MR HUB (t.me/minrteam)",
    LoadingSubtitle = "By MineRoma Team",
