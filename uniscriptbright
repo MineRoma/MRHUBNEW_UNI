@@ -1,14 +1,9 @@
--- Проверяем доступные методы затемнения
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-
--- Ждем загрузки персонажа
 if not LocalPlayer.Character then
     LocalPlayer.CharacterAdded:Wait()
 end
-
--- Основные настройки освещения
 Lighting.GlobalShadows = false
 Lighting.Brightness = 2
 Lighting.FogEnd = 1000000
@@ -16,15 +11,11 @@ Lighting.FogStart = 0
 Lighting.ClockTime = 14
 Lighting.GeographicLatitude = 41.733
 Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
-
--- Дополнительные настройки
 Lighting.Ambient = Color3.fromRGB(255, 255, 255)
 Lighting.ColorShift_Bottom = Color3.fromRGB(0, 0, 0)
 Lighting.ColorShift_Top = Color3.fromRGB(0, 0, 0)
 Lighting.EnvironmentDiffuseScale = 1
 Lighting.EnvironmentSpecularScale = 1
-
--- Отключаем все эффекты
 for _, descendant in pairs(Lighting:GetDescendants()) do
     if descendant:IsA("Atmosphere") then
         descendant:Destroy()
@@ -42,8 +33,6 @@ for _, descendant in pairs(Lighting:GetDescendants()) do
         descendant:Destroy()
     end
 end
-
--- Создаем яркий источник света
 if not Lighting:FindFirstChild("FullBrightLight") then
     local newLight = Instance.new("PointLight")
     newLight.Name = "FullBrightLight"
@@ -51,5 +40,4 @@ if not Lighting:FindFirstChild("FullBrightLight") then
     newLight.Range = 1000
     newLight.Parent = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 end
-
-print("Яркий свет активирован! Туман отключен.")
+print("успишно!")
