@@ -161,7 +161,7 @@ local function verifyKey(key)
             if decoded.success and decoded.data.valid then
                 return true, "Verified"
             else
-                return false, "Invalid" -- Просто Invalid, так как API не уточняет
+                return false, "Invalid"
             end
         elseif response.StatusCode == 429 then
             return false, "Rate Limited"
@@ -207,19 +207,29 @@ local notifWidth = isMobile and 260 or 310
 local notifHeight = isMobile and 65 or 75
 local notifCount = 0
 
+-- FIXED ANIMATION LOGIC
 local function showNotification(title, text, color, duration)
     duration = duration or 3
     color = color or Color3.fromRGB(161, 46, 255)
     notifCount = notifCount + 1
     
+    -- 1. Holder (Invisible Frame that holds space in the ListLayout)
+    local Holder = Instance.new("Frame")
+    Holder.Name = "Holder" .. notifCount
+    Holder.Parent = NotifContainer
+    Holder.BackgroundTransparency = 1
+    Holder.Size = UDim2.new(0, notifWidth, 0, notifHeight)
+    Holder.LayoutOrder = -notifCount -- Newest at bottom
+    
+    -- 2. Visual Frame (Inside Holder, free to move)
     local NotifFrame = Instance.new("Frame")
-    NotifFrame.Name = "Notif"..notifCount
-    NotifFrame.Parent = NotifContainer
+    NotifFrame.Name = "Visual"
+    NotifFrame.Parent = Holder
     NotifFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
     NotifFrame.BackgroundTransparency = 0.05
     NotifFrame.BorderSizePixel = 0
-    NotifFrame.Size = UDim2.new(0, notifWidth, 0, notifHeight)
-    NotifFrame.Position = UDim2.new(1, 50, 0, 0)
+    NotifFrame.Size = UDim2.new(1, 0, 1, 0)
+    NotifFrame.Position = UDim2.new(1.5, 0, 0, 0) -- Start off-screen right
     NotifFrame.ClipsDescendants = true
     
     local NotifCorner = Instance.new("UICorner") NotifCorner.CornerRadius = UDim.new(0, 10) NotifCorner.Parent = NotifFrame
@@ -229,8 +239,24 @@ local function showNotification(title, text, color, duration)
     local NotifTitle = Instance.new("TextLabel") NotifTitle.Parent = NotifFrame NotifTitle.BackgroundTransparency = 1 NotifTitle.Position = UDim2.new(0, 14, 0, 10) NotifTitle.Size = UDim2.new(1, -24, 0, 22) NotifTitle.Font = Enum.Font.LuckiestGuy NotifTitle.Text = title NotifTitle.TextColor3 = Color3.new(1,1,1) NotifTitle.TextSize = isMobile and 15 or 17 NotifTitle.TextXAlignment = Enum.TextXAlignment.Left
     local NotifText = Instance.new("TextLabel") NotifText.Parent = NotifFrame NotifText.BackgroundTransparency = 1 NotifText.Position = UDim2.new(0, 14, 0, 34) NotifText.Size = UDim2.new(1, -24, 0, 35) NotifText.Font = Enum.Font.Gotham NotifText.Text = text NotifText.TextColor3 = Color3.fromRGB(190, 190, 190) NotifText.TextSize = isMobile and 12 or 14 NotifText.TextXAlignment = Enum.TextXAlignment.Left NotifText.TextWrapped = true NotifText.TextYAlignment = Enum.TextYAlignment.Top
     
-    TweenService:Create(NotifFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 0, 0, 0)}):Play()
-    task.delay(duration, function() if NotifFrame.Parent then local t = TweenService:Create(NotifFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2.new(1, 50, 0, 0)}) t:Play() t.Completed:Connect(function() NotifFrame:Destroy() end) end end)
+    -- 3. Smooth Slide In (Tween Position relative to Holder)
+    local tweenIn = TweenService:Create(NotifFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+        Position = UDim2.new(0, 0, 0, 0)
+    })
+    tweenIn:Play()
+    
+    -- 4. Smooth Slide Out
+    task.delay(duration, function()
+        if Holder and Holder.Parent then
+            local tweenOut = TweenService:Create(NotifFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {
+                Position = UDim2.new(1.5, 0, 0, 0)
+            })
+            tweenOut:Play()
+            tweenOut.Completed:Connect(function()
+                Holder:Destroy()
+            end)
+        end
+    end)
 end
 
 -- Main UI Setup
@@ -297,9 +323,9 @@ TextBox.TextSize = isMobile and 14 or 16
 TextBox.ClipsDescendants = true
 local TCorner = Instance.new("UICorner") TCorner.CornerRadius = UDim.new(0, 10) TCorner.Parent = TextBox
 
--- FIX: Темно-фиолетовая обводка (не режет глаза)
+-- Темно-фиолетовая обводка
 local TStroke = Instance.new("UIStroke") 
-TStroke.Color = Color3.fromRGB(80, 45, 120) -- <-- ИЗМЕНЕНО
+TStroke.Color = Color3.fromRGB(80, 45, 120) 
 TStroke.Thickness = 1.5 
 TStroke.Parent = TextBox
 
@@ -337,7 +363,6 @@ GetKeyBtn.MouseButton1Click:Connect(function()
     task.spawn(function()
         local s, r = copyLink()
         if s then
-            -- FIX: Текст уведомления
             showNotification("Success!", "Link copied to clipboard!", Color3.fromRGB(0, 255, 100), 4)
             GetKeyBtn.Text = "COPIED!"
             task.wait(2)
@@ -364,7 +389,6 @@ CheckKeyBtn.MouseButton1Click:Connect(function()
             ScreenGui:Destroy()
             loadstring(game:HttpGet('https://raw.githubusercontent.com/MineRoma/MRHUBNEW_UNI/refs/heads/main/nnnft'))()
         else
-            -- FIX: Текст ошибки при ручном вводе
             showNotification("Error", "Key is invalid or expired", Color3.fromRGB(255, 50, 50), 4)
             CheckKeyBtn.Text = "CHECK KEY"
         end
@@ -383,7 +407,6 @@ task.spawn(function()
             ScreenGui:Destroy()
             loadstring(game:HttpGet('https://raw.githubusercontent.com/MineRoma/MRHUBNEW_UNI/refs/heads/main/nnnft'))()
         else
-            -- FIX: Текст ошибки при авто-загрузке
             showNotification("Expired", "Saved key expired", Color3.fromRGB(255, 150, 0), 4)
             TextBox.Text = saved
         end
