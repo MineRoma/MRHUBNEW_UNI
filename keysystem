@@ -11,16 +11,36 @@ local fSetClipboard, fRequest, fStringChar, fToString, fStringSub, fOsTime, fMat
 -- EXECUTOR DETECTION & FUNCTION SETUP
 -- =========================================================================
 local ExecutorName = "Unknown"
+local isDelta = false
 
 -- Detect executor
-if identifyexecutor then
-    pcall(function() ExecutorName = identifyexecutor() end)
-elseif getexecutorname then
-    pcall(function() ExecutorName = getexecutorname() end)
+pcall(function()
+    if identifyexecutor then
+        ExecutorName = identifyexecutor()
+    elseif getexecutorname then
+        ExecutorName = getexecutorname()
+    end
+end)
+
+-- Check if Delta
+if string.lower(ExecutorName):find("delta") then
+    isDelta = true
+elseif Delta or getgenv().Delta then
+    isDelta = true
+    ExecutorName = "Delta"
 end
 
 -- Request function
-if syn and syn.request then
+if isDelta then
+    -- Delta specific
+    if request then
+        fRequest = request
+    elseif http_request then
+        fRequest = http_request
+    elseif http and http.request then
+        fRequest = http.request
+    end
+elseif syn and syn.request then
     fRequest = syn.request
 elseif fluxus and fluxus.request then
     fRequest = fluxus.request
@@ -35,7 +55,13 @@ elseif http_request then
 end
 
 -- Clipboard function
-if setclipboard then
+if isDelta then
+    if setclipboard then
+        fSetClipboard = setclipboard
+    elseif toclipboard then
+        fSetClipboard = toclipboard
+    end
+elseif setclipboard then
     fSetClipboard = setclipboard
 elseif toclipboard then
     fSetClipboard = toclipboard
@@ -46,7 +72,17 @@ elseif getgenv().Xeno and getgenv().Xeno.setclipboard then
 end
 
 -- HWID function
-if gethwid then
+if isDelta then
+    if getdeviceid then
+        fGetHwid = getdeviceid
+    elseif getandroidid then
+        fGetHwid = getandroidid
+    elseif gethwid then
+        fGetHwid = gethwid
+    else
+        fGetHwid = function() return tostring(game:GetService("Players").LocalPlayer.UserId) end
+    end
+elseif gethwid then
     fGetHwid = gethwid
 elseif getdeviceid then
     fGetHwid = getdeviceid
@@ -57,7 +93,7 @@ elseif syn and syn.hw_id then
 elseif getgenv().Xeno and getgenv().Xeno.getDeviceId then
     fGetHwid = getgenv().Xeno.getDeviceId
 else
-    fGetHwid = function() return game:GetService("Players").LocalPlayer.UserId end
+    fGetHwid = function() return tostring(game:GetService("Players").LocalPlayer.UserId) end
 end
 
 fStringChar = string.char
@@ -77,6 +113,42 @@ local isMobile = UserInputService.TouchEnabled and not UserInputService.MouseEna
 
 -- Key save file with custom extension
 local KEY_FILE = "MRHub_Key.mrhk"
+
+-- File functions for Delta
+local function safeWriteFile(name, content)
+    local success = pcall(function()
+        if writefile then
+            writefile(name, content)
+        end
+    end)
+    return success
+end
+
+local function safeReadFile(name)
+    local success, content = pcall(function()
+        if isfile and isfile(name) then
+            return readfile(name)
+        end
+        return nil
+    end)
+    if success then
+        return content
+    end
+    return nil
+end
+
+local function safeIsFile(name)
+    local success, result = pcall(function()
+        if isfile then
+            return isfile(name)
+        end
+        return false
+    end)
+    if success then
+        return result
+    end
+    return false
+end
 
 -- Encode/Decode key for obfuscation
 local function encodeKey(key)
@@ -126,43 +198,14 @@ end
 
 -- Save key function
 local function saveKey(key)
-    pcall(function()
-        if writefile then
-            writefile(KEY_FILE, encodeKey(key))
-        elseif getgenv().Xeno and getgenv().Xeno.writefile then
-            getgenv().Xeno.writefile(KEY_FILE, encodeKey(key))
-        end
-    end)
+    safeWriteFile(KEY_FILE, encodeKey(key))
 end
 
 -- Load key function
 local function loadKey()
-    local success, result = pcall(function()
-        local fileExists = false
-        
-        if isfile then
-            fileExists = isfile(KEY_FILE)
-        elseif getgenv().Xeno and getgenv().Xeno.isfile then
-            fileExists = getgenv().Xeno.isfile(KEY_FILE)
-        end
-        
-        if fileExists then
-            local content
-            if readfile then
-                content = readfile(KEY_FILE)
-            elseif getgenv().Xeno and getgenv().Xeno.readfile then
-                content = getgenv().Xeno.readfile(KEY_FILE)
-            end
-            
-            if content and content ~= "" then
-                return decodeKey(content)
-            end
-        end
-        return nil
-    end)
-    
-    if success and result and result ~= "" then
-        return result
+    local content = safeReadFile(KEY_FILE)
+    if content and content ~= "" then
+        return decodeKey(content)
     end
     return nil
 end
@@ -190,12 +233,14 @@ end
 
 local host = "https://api.platoboost.com";
 pcall(function()
-    local hostResponse = fRequest({
-        Url = host .. "/public/connectivity",
-        Method = "GET"
-    });
-    if hostResponse.StatusCode ~= 200 then
-        host = "https://api.platoboost.net";
+    if fRequest then
+        local hostResponse = fRequest({
+            Url = host .. "/public/connectivity",
+            Method = "GET"
+        });
+        if hostResponse and hostResponse.StatusCode ~= 200 then
+            host = "https://api.platoboost.net";
+        end
     end
 end)
 
@@ -204,55 +249,78 @@ function cacheLink()
         return true, cachedLink;
     end
     
-    local response = fRequest({
-        Url = host .. "/public/start",
-        Method = "POST",
-        Body = lEncode({
-            service = service,
-            identifier = lDigest(fGetHwid())
-        }),
-        Headers = {
-            ["Content-Type"] = "application/json"
-        }
-    });
+    if not fRequest then
+        return false, "Request function not available"
+    end
+    
+    local success, response = pcall(function()
+        return fRequest({
+            Url = host .. "/public/start",
+            Method = "POST",
+            Body = lEncode({
+                service = service,
+                identifier = lDigest(fGetHwid())
+            }),
+            Headers = {
+                ["Content-Type"] = "application/json"
+            }
+        })
+    end)
+    
+    if not success or not response then
+        return false, "Request failed"
+    end
 
     if response.StatusCode == 200 then
-        local decoded = lDecode(response.Body);
-        if decoded.success == true then
+        local decodeSuccess, decoded = pcall(function()
+            return lDecode(response.Body)
+        end)
+        
+        if decodeSuccess and decoded and decoded.success == true then
             cachedLink = decoded.data.url;
             cachedTime = fOsTime();
             return true, cachedLink;
+        elseif decodeSuccess and decoded then
+            return false, decoded.message or "Unknown error";
         else
-            return false, decoded.message;
+            return false, "Failed to decode response"
         end
     elseif response.StatusCode == 429 then
         return false, "Rate limited, wait 20 seconds.";
     end
-    return false, "Failed to get link.";
+    return false, "Failed to get link (Status: " .. tostring(response.StatusCode) .. ")";
 end
 
-cacheLink();
+pcall(cacheLink);
 
 local generateNonce = function()
     local str = ""
+    math.randomseed(tick() * 1000)
     for _ = 1, 16 do
         str = str .. fStringChar(fMathFloor(fMathRandom() * (122 - 97 + 1)) + 97)
     end
     return str
 end
 
-for _ = 1, 5 do
-    local oNonce = generateNonce();
-    task.wait(0.2)
-    if generateNonce() == oNonce then
-        error("Platoboost nonce error.");
+-- Skip nonce check on Delta (can cause issues)
+if not isDelta then
+    for _ = 1, 5 do
+        local oNonce = generateNonce();
+        task.wait(0.2)
+        if generateNonce() == oNonce then
+            error("Platoboost nonce error.");
+        end
     end
 end
 
 local copyLink = function()
     local success, link = cacheLink();
     if success then
-        fSetClipboard(link);
+        if fSetClipboard then
+            pcall(function()
+                fSetClipboard(link)
+            end)
+        end
         return true, link
     end
     return false, link
@@ -264,6 +332,11 @@ local verifyKey = function(key)
     else
         requestSending = true;
     end
+    
+    if not fRequest then
+        requestSending = false
+        return false, "Request function not available"
+    end
 
     local nonce = generateNonce();
     local endpoint = host .. "/public/whitelist/" .. fToString(service) .. "?identifier=" .. lDigest(fGetHwid()) .. "&key=" .. key;
@@ -272,23 +345,34 @@ local verifyKey = function(key)
         endpoint = endpoint .. "&nonce=" .. nonce;
     end
 
-    local response = fRequest({
-        Url = endpoint,
-        Method = "GET",
-    });
+    local success, response = pcall(function()
+        return fRequest({
+            Url = endpoint,
+            Method = "GET",
+        })
+    end)
 
     requestSending = false;
+    
+    if not success or not response then
+        return false, "Request failed"
+    end
 
     if response.StatusCode == 200 then
-        local decoded = lDecode(response.Body);
-        if decoded.success == true then
+        local decodeSuccess, decoded = pcall(function()
+            return lDecode(response.Body)
+        end)
+        
+        if decodeSuccess and decoded and decoded.success == true then
             if decoded.data.valid == true then
                 return true, "Key verified!";
             else
                 return false, "Key is invalid or expired.";
             end
+        elseif decodeSuccess and decoded then
+            return false, decoded.message or "Unknown error";
         else
-            return false, decoded.message;
+            return false, "Failed to decode response"
         end
     elseif response.StatusCode == 429 then
         return false, "Rate limited, wait 20 seconds.";
@@ -307,18 +391,41 @@ ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.DisplayOrder = 999999
 ScreenGui.IgnoreGuiInset = true
 
--- GUI Parent based on executor
-if syn and syn.protect_gui then
+-- GUI Parent based on executor (Delta friendly)
+local guiParentSuccess = false
+
+if isDelta then
+    -- Delta: try PlayerGui first, then CoreGui
+    pcall(function()
+        ScreenGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+        guiParentSuccess = true
+    end)
+    if not guiParentSuccess then
+        pcall(function()
+            ScreenGui.Parent = game:GetService("CoreGui")
+            guiParentSuccess = true
+        end)
+    end
+elseif syn and syn.protect_gui then
     syn.protect_gui(ScreenGui)
     ScreenGui.Parent = game:GetService("CoreGui")
+    guiParentSuccess = true
 elseif gethui then
-    ScreenGui.Parent = gethui()
-else
-    local success = pcall(function()
-        ScreenGui.Parent = game:GetService("CoreGui")
+    pcall(function()
+        ScreenGui.Parent = gethui()
+        guiParentSuccess = true
     end)
-    if not success then
-        ScreenGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+end
+
+if not guiParentSuccess then
+    pcall(function()
+        ScreenGui.Parent = game:GetService("CoreGui")
+        guiParentSuccess = true
+    end)
+    if not guiParentSuccess then
+        pcall(function()
+            ScreenGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+        end)
     end
 end
 
@@ -451,6 +558,7 @@ local dragStart
 local startPos
 
 local function updateDrag(input)
+    if not dragging then return end
     local delta = input.Position - dragStart
     MainContainer.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 end
@@ -644,7 +752,7 @@ InfoText.TextSize = isMobile and 12 or 14
 -- !!! BUTTON CONNECTIONS !!!
 -- =========================================================================
 
-GetKeyBtn.MouseButton1Down:Connect(function()
+GetKeyBtn.MouseButton1Click:Connect(function()
     GetKeyBtn.Text = "LOADING..."
     
     task.spawn(function()
@@ -662,7 +770,7 @@ GetKeyBtn.MouseButton1Down:Connect(function()
     end)
 end)
 
-CheckKeyBtn.MouseButton1Down:Connect(function()
+CheckKeyBtn.MouseButton1Click:Connect(function()
     local key = TextBox.Text
     
     if key == "" or key == nil then
