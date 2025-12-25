@@ -1,5 +1,5 @@
-local service = "16451";
-local secret = "3fd9b8c7-1f40-41e6-afb7-b5d98a48d6e7";
+local service = "16451"
+local secret = "3fd9b8c7-1f40-41e6-afb7-b5d98a48d6e7"
 local useNonce = true
 
 repeat task.wait(1) until game:IsLoaded() or game.Players.LocalPlayer
@@ -187,7 +187,7 @@ pcall(function()
 end)
 if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
--- Notifs
+-- Notifs Container
 local NotifContainer = Instance.new("Frame")
 NotifContainer.Name = "NotifContainer"
 NotifContainer.Parent = ScreenGui
@@ -207,49 +207,57 @@ local notifWidth = isMobile and 260 or 310
 local notifHeight = isMobile and 65 or 75
 local notifCount = 0
 
--- FIXED ANIMATION LOGIC
+-- FIXED ANIMATION SYSTEM
 local function showNotification(title, text, color, duration)
     duration = duration or 3
     color = color or Color3.fromRGB(161, 46, 255)
     notifCount = notifCount + 1
     
-    -- 1. Holder (Invisible Frame that holds space in the ListLayout)
+    -- 1. Holder (Invisible container for ListLayout)
     local Holder = Instance.new("Frame")
-    Holder.Name = "Holder" .. notifCount
+    Holder.Name = "Holder"..notifCount
     Holder.Parent = NotifContainer
     Holder.BackgroundTransparency = 1
     Holder.Size = UDim2.new(0, notifWidth, 0, notifHeight)
-    Holder.LayoutOrder = -notifCount -- Newest at bottom
+    Holder.LayoutOrder = -notifCount
+    -- Important: Holder does NOT clip descendants so we can see the slide
+    Holder.ClipsDescendants = false 
     
-    -- 2. Visual Frame (Inside Holder, free to move)
-    local NotifFrame = Instance.new("Frame")
-    NotifFrame.Name = "Visual"
-    NotifFrame.Parent = Holder
-    NotifFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-    NotifFrame.BackgroundTransparency = 0.05
-    NotifFrame.BorderSizePixel = 0
-    NotifFrame.Size = UDim2.new(1, 0, 1, 0)
-    NotifFrame.Position = UDim2.new(1.5, 0, 0, 0) -- Start off-screen right
-    NotifFrame.ClipsDescendants = true
+    -- 2. Visual Frame (The actual notification)
+    local Visual = Instance.new("Frame")
+    Visual.Name = "Visual"
+    Visual.Parent = Holder
+    Visual.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    Visual.BackgroundTransparency = 0.05
+    Visual.BorderSizePixel = 0
+    Visual.Size = UDim2.new(1, 0, 1, 0)
+    -- Start OFF-SCREEN to the RIGHT (100% width + 20px padding)
+    Visual.Position = UDim2.new(1, 20, 0, 0) 
+    Visual.ClipsDescendants = true
     
-    local NotifCorner = Instance.new("UICorner") NotifCorner.CornerRadius = UDim.new(0, 10) NotifCorner.Parent = NotifFrame
-    local NotifStroke = Instance.new("UIStroke") NotifStroke.Color = color NotifStroke.Thickness = 2 NotifStroke.Transparency = 0.3 NotifStroke.Parent = NotifFrame
-    local ColorBar = Instance.new("Frame") ColorBar.Parent = NotifFrame ColorBar.BackgroundColor3 = color ColorBar.BorderSizePixel = 0 ColorBar.Size = UDim2.new(0, 4, 1, 0)
+    -- Styling
+    local NotifCorner = Instance.new("UICorner") NotifCorner.CornerRadius = UDim.new(0, 10) NotifCorner.Parent = Visual
+    local NotifStroke = Instance.new("UIStroke") NotifStroke.Color = color NotifStroke.Thickness = 2 NotifStroke.Transparency = 0.3 NotifStroke.Parent = Visual
+    local ColorBar = Instance.new("Frame") ColorBar.Parent = Visual ColorBar.BackgroundColor3 = color ColorBar.BorderSizePixel = 0 ColorBar.Size = UDim2.new(0, 4, 1, 0)
     
-    local NotifTitle = Instance.new("TextLabel") NotifTitle.Parent = NotifFrame NotifTitle.BackgroundTransparency = 1 NotifTitle.Position = UDim2.new(0, 14, 0, 10) NotifTitle.Size = UDim2.new(1, -24, 0, 22) NotifTitle.Font = Enum.Font.LuckiestGuy NotifTitle.Text = title NotifTitle.TextColor3 = Color3.new(1,1,1) NotifTitle.TextSize = isMobile and 15 or 17 NotifTitle.TextXAlignment = Enum.TextXAlignment.Left
-    local NotifText = Instance.new("TextLabel") NotifText.Parent = NotifFrame NotifText.BackgroundTransparency = 1 NotifText.Position = UDim2.new(0, 14, 0, 34) NotifText.Size = UDim2.new(1, -24, 0, 35) NotifText.Font = Enum.Font.Gotham NotifText.Text = text NotifText.TextColor3 = Color3.fromRGB(190, 190, 190) NotifText.TextSize = isMobile and 12 or 14 NotifText.TextXAlignment = Enum.TextXAlignment.Left NotifText.TextWrapped = true NotifText.TextYAlignment = Enum.TextYAlignment.Top
+    local NotifTitle = Instance.new("TextLabel") NotifTitle.Parent = Visual NotifTitle.BackgroundTransparency = 1 NotifTitle.Position = UDim2.new(0, 14, 0, 10) NotifTitle.Size = UDim2.new(1, -24, 0, 22) NotifTitle.Font = Enum.Font.LuckiestGuy NotifTitle.Text = title NotifTitle.TextColor3 = Color3.new(1,1,1) NotifTitle.TextSize = isMobile and 15 or 17 NotifTitle.TextXAlignment = Enum.TextXAlignment.Left
+    local NotifText = Instance.new("TextLabel") NotifText.Parent = Visual NotifText.BackgroundTransparency = 1 NotifText.Position = UDim2.new(0, 14, 0, 34) NotifText.Size = UDim2.new(1, -24, 0, 35) NotifText.Font = Enum.Font.Gotham NotifText.Text = text NotifText.TextColor3 = Color3.fromRGB(190, 190, 190) NotifText.TextSize = isMobile and 12 or 14 NotifText.TextXAlignment = Enum.TextXAlignment.Left NotifText.TextWrapped = true NotifText.TextYAlignment = Enum.TextYAlignment.Top
+
+    -- 3. ANIMATION
+    -- Wait a frame to ensure position is set before tweening (Fixes instant appearance)
+    task.wait()
     
-    -- 3. Smooth Slide In (Tween Position relative to Holder)
-    local tweenIn = TweenService:Create(NotifFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+    -- Slide IN (Right -> Center)
+    local tweenIn = TweenService:Create(Visual, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
         Position = UDim2.new(0, 0, 0, 0)
     })
     tweenIn:Play()
     
-    -- 4. Smooth Slide Out
+    -- Slide OUT (Center -> Right)
     task.delay(duration, function()
         if Holder and Holder.Parent then
-            local tweenOut = TweenService:Create(NotifFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {
-                Position = UDim2.new(1.5, 0, 0, 0)
+            local tweenOut = TweenService:Create(Visual, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {
+                Position = UDim2.new(1, 20, 0, 0)
             })
             tweenOut:Play()
             tweenOut.Completed:Connect(function()
@@ -323,7 +331,6 @@ TextBox.TextSize = isMobile and 14 or 16
 TextBox.ClipsDescendants = true
 local TCorner = Instance.new("UICorner") TCorner.CornerRadius = UDim.new(0, 10) TCorner.Parent = TextBox
 
--- Темно-фиолетовая обводка
 local TStroke = Instance.new("UIStroke") 
 TStroke.Color = Color3.fromRGB(80, 45, 120) 
 TStroke.Thickness = 1.5 
