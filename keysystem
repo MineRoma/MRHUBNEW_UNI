@@ -1,93 +1,91 @@
 local service = "16451";
 local secret = "3fd9b8c7-1f40-41e6-afb7-b5d98a48d6e7";
--- Ждем загрузку
+-- =========================================================================
+-- SYSTEM SETUP
+-- =========================================================================
 repeat task.wait() until game:IsLoaded()
 
--- Сервисы
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
-local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
--- 1. НАХОДИМ ФУНКЦИЮ ЗАПРОСА (УНИВЕРСАЛЬНО)
+-- 1. SEARCH FOR REQUEST FUNCTION
 local requestFunc = request or http_request or (http and http.request) or (syn and syn.request) or (fluxus and fluxus.request)
 
 if not requestFunc then
     game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "Error",
-        Text = "Executor not supported (No request func)",
-        Duration = 5
+        Title = "Error", Text = "Executor not supported", Duration = 5
     })
     return
 end
 
--- 2. НАХОДИМ HWID (ПРОСТО)
+-- 2. HWID & HASH
 local function getHwid()
-    if gethwid then return gethwid()
-    elseif getdeviceid then return getdeviceid()
-    elseif getandroidid then return getandroidid()
-    else return tostring(Players.LocalPlayer.UserId) end
+    local h = nil
+    pcall(function()
+        if gethwid then h = gethwid()
+        elseif getdeviceid then h = getdeviceid()
+        elseif getandroidid then h = getandroidid() end
+    end)
+    return h or tostring(Players.LocalPlayer.UserId)
 end
 
--- 3. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
 local function hash(str)
     local h = ""
-    for i = 1, #str do
-        h = h .. string.format("%02x", string.byte(str, i))
-    end
+    for i = 1, #str do h = h .. string.format("%02x", string.byte(str, i)) end
     return h
 end
 
-local function safeSave(name, data)
-    pcall(function() writefile(name, data) end)
+-- 3. DOMAIN LOGIC (FIX FOR DNS ERROR)
+local domains = {
+    "https://api.platoboost.net", -- Пробуем .net первым (он стабильнее)
+    "https://api.platoboost.com"
+}
+local currentHost = domains[1]
+
+local function makeRequest(endpoint, method, body)
+    local lastError = ""
+    
+    -- Пробуем каждый домен по очереди
+    for _, domain in ipairs(domains) do
+        local url = domain .. endpoint
+        
+        local success, result = pcall(function()
+            return requestFunc({
+                Url = url,
+                Method = method,
+                Headers = {["Content-Type"] = "application/json"},
+                Body = body
+            })
+        end)
+        
+        if success and result then
+            -- Если статус 200 или 429 (рейт лимит), значит домен живой
+            if result.StatusCode == 200 or result.StatusCode == 429 then
+                currentHost = domain -- Запоминаем рабочий домен
+                return result
+            end
+            lastError = "HTTP " .. tostring(result.StatusCode)
+        else
+            lastError = tostring(result) -- DNS Error будет здесь
+        end
+    end
+    
+    return nil, lastError
 end
 
-local function safeLoad(name)
-    local s, r = pcall(function() return readfile(name) end)
-    return (s and r) or nil
-end
-
--- 4. GUI (ФИОЛЕТОВАЯ ТЕМА + LUCKIEST GUY)
+-- =========================================================================
+-- GUI
+-- =========================================================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "MRHubKeySystem"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.IgnoreGuiInset = true
 
--- Пытаемся засунуть в CoreGui, если нет - в PlayerGui (для Delta)
-pcall(function()
-    ScreenGui.Parent = CoreGui
-end)
-if not ScreenGui.Parent then
-    ScreenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
-end
+pcall(function() ScreenGui.Parent = CoreGui end)
+if not ScreenGui.Parent then ScreenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui") end
 
--- Уведомления
-local NotifContainer = Instance.new("Frame")
-NotifContainer.Parent = ScreenGui
-NotifContainer.BackgroundTransparency = 1
-NotifContainer.Position = UDim2.new(1, -10, 1, -10)
-NotifContainer.Size = UDim2.new(0, 300, 0, 400)
-NotifContainer.AnchorPoint = Vector2.new(1, 1)
-local NotifLayout = Instance.new("UIListLayout") NotifLayout.Parent = NotifContainer NotifLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom NotifLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right NotifLayout.Padding = UDim.new(0, 5)
-
-local function notify(title, text, color)
-    local F = Instance.new("Frame")
-    F.Parent = NotifContainer
-    F.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-    F.Size = UDim2.new(0, 280, 0, 60)
-    F.BackgroundTransparency = 0.1
-    
-    local S = Instance.new("UIStroke") S.Parent = F S.Color = color S.Thickness = 1.5
-    local C = Instance.new("UICorner") C.Parent = F C.CornerRadius = UDim.new(0, 8)
-    
-    local T = Instance.new("TextLabel") T.Parent = F T.BackgroundTransparency = 1 T.Position = UDim2.new(0, 10, 0, 5) T.Size = UDim2.new(1, -20, 0, 20) T.Font = Enum.Font.LuckiestGuy T.Text = title T.TextColor3 = Color3.new(1,1,1) T.TextSize = 14 T.TextXAlignment = Enum.TextXAlignment.Left
-    local D = Instance.new("TextLabel") D.Parent = F D.BackgroundTransparency = 1 D.Position = UDim2.new(0, 10, 0, 25) D.Size = UDim2.new(1, -20, 0, 30) D.Font = Enum.Font.Gotham D.Text = text D.TextColor3 = Color3.fromRGB(200,200,200) D.TextSize = 12 D.TextXAlignment = Enum.TextXAlignment.Left D.TextWrapped = true
-
-    task.delay(4, function() F:Destroy() end)
-end
-
--- Главное окно
 local Main = Instance.new("Frame")
 Main.Name = "Main"
 Main.Parent = ScreenGui
@@ -96,208 +94,134 @@ Main.Position = UDim2.new(0.5, 0, 0.5, 0)
 Main.AnchorPoint = Vector2.new(0.5, 0.5)
 Main.BackgroundColor3 = Color3.fromRGB(35, 18, 55)
 Main.BorderSizePixel = 0
-
 local MC = Instance.new("UICorner") MC.Parent = Main MC.CornerRadius = UDim.new(0, 10)
 local MS = Instance.new("UIStroke") MS.Parent = Main MS.Color = Color3.fromRGB(161, 46, 255) MS.Thickness = 2
 
--- Шапка (Перетаскивание)
+-- Header
 local Header = Instance.new("Frame") Header.Parent = Main Header.Size = UDim2.new(1,0,0,50) Header.BackgroundColor3 = Color3.fromRGB(85, 24, 134)
 local HC = Instance.new("UICorner") HC.Parent = Header HC.CornerRadius = UDim.new(0, 10)
-local HF = Instance.new("Frame") HF.Parent = Header HF.Size = UDim2.new(1,0,0.5,0) HF.Position = UDim2.new(0,0,0.5,0) HF.BorderSizePixel = 0 HF.BackgroundColor3 = Color3.fromRGB(85, 24, 134)
-
 local HT = Instance.new("TextLabel") HT.Parent = Header HT.Size = UDim2.new(1,0,1,0) HT.BackgroundTransparency = 1 HT.Font = Enum.Font.LuckiestGuy HT.Text = "MINEROMA TEAM | KEY SYSTEM" HT.TextColor3 = Color3.new(1,1,1) HT.TextSize = 16
 
--- Логика перетаскивания
-local dragging, dragInput, dragStart, startPos
-Header.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = Main.Position
-        
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then dragging = false end
-        end)
-    end
-end)
-Header.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        local delta = input.Position - dragStart
-        Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
+-- Dragging
+local dragging, dragStart, startPos
+Header.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then dragging=true dragStart=i.Position startPos=Main.Position end end)
+UserInputService.InputChanged:Connect(function(i) if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then local d=i.Position-dragStart Main.Position=UDim2.new(startPos.X.Scale,startPos.X.Offset+d.X,startPos.Y.Scale,startPos.Y.Offset+d.Y) end end)
+Header.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then dragging=false end end)
 
--- Элементы управления
-local function createButton(text, pos)
-    local B = Instance.new("TextButton")
-    B.Parent = Main
-    B.Size = UDim2.new(0.8, 0, 0, 45)
-    B.Position = pos
-    B.AnchorPoint = Vector2.new(0.5, 0)
-    B.BackgroundColor3 = Color3.fromRGB(161, 46, 255)
-    B.Font = Enum.Font.LuckiestGuy
-    B.Text = text
-    B.TextColor3 = Color3.new(1,1,1)
-    B.TextSize = 18
-    local C = Instance.new("UICorner") C.Parent = B C.CornerRadius = UDim.new(0, 8)
+-- Notifications
+local NotifContainer = Instance.new("Frame") NotifContainer.Parent = ScreenGui NotifContainer.Size = UDim2.new(0,300,0,400) NotifContainer.Position = UDim2.new(1,-10,1,-10) NotifContainer.AnchorPoint = Vector2.new(1,1) NotifContainer.BackgroundTransparency = 1
+local NL = Instance.new("UIListLayout") NL.Parent = NotifContainer NL.VerticalAlignment = Enum.VerticalAlignment.Bottom NL.HorizontalAlignment = Enum.HorizontalAlignment.Right NL.Padding = UDim.new(0,5)
+
+local function notify(title, text, color)
+    local F = Instance.new("Frame") F.Parent = NotifContainer F.Size = UDim2.new(0,280,0,60) F.BackgroundColor3 = Color3.fromRGB(25,25,35) F.BackgroundTransparency = 0.1
+    local S = Instance.new("UIStroke") S.Parent = F S.Color = color S.Thickness = 1.5
+    local C = Instance.new("UICorner") C.Parent = F C.CornerRadius = UDim.new(0,8)
+    local T = Instance.new("TextLabel") T.Parent = F T.BackgroundTransparency=1 T.Position=UDim2.new(0,10,0,5) T.Size=UDim2.new(1,-20,0,20) T.Font=Enum.Font.LuckiestGuy T.Text=title T.TextColor3=Color3.new(1,1,1) T.TextSize=14 T.TextXAlignment=Enum.TextXAlignment.Left
+    local D = Instance.new("TextLabel") D.Parent = F D.BackgroundTransparency=1 D.Position=UDim2.new(0,10,0,25) D.Size=UDim2.new(1,-20,0,30) D.Font=Enum.Font.Gotham D.Text=text D.TextColor3=Color3.fromRGB(200,200,200) D.TextSize=12 T.TextXAlignment=Enum.TextXAlignment.Left D.TextWrapped=true
+    task.delay(4, function() F:Destroy() end)
+end
+
+-- Controls
+local function btn(text, y)
+    local B = Instance.new("TextButton") B.Parent = Main B.Size = UDim2.new(0.8,0,0,45) B.Position = UDim2.new(0.5,0,0,y) B.AnchorPoint = Vector2.new(0.5,0) B.BackgroundColor3 = Color3.fromRGB(161, 46, 255) B.Font = Enum.Font.LuckiestGuy B.Text = text B.TextColor3 = Color3.new(1,1,1) B.TextSize = 18
+    local C = Instance.new("UICorner") C.Parent = B C.CornerRadius = UDim.new(0,8)
     return B
 end
 
-local GetKeyBtn = createButton("GET KEY", UDim2.new(0.5, 0, 0, 70))
-local CheckKeyBtn = createButton("CHECK KEY", UDim2.new(0.5, 0, 0, 200))
+local GetKeyBtn = btn("GET KEY", 70)
+local CheckKeyBtn = btn("CHECK KEY", 200)
 
-local KeyInput = Instance.new("TextBox")
-KeyInput.Parent = Main
-KeyInput.Size = UDim2.new(0.8, 0, 0, 45)
-KeyInput.Position = UDim2.new(0.5, 0, 0, 135)
-KeyInput.AnchorPoint = Vector2.new(0.5, 0)
-KeyInput.BackgroundColor3 = Color3.fromRGB(45, 22, 70)
-KeyInput.Font = Enum.Font.Gotham
-KeyInput.Text = ""
-KeyInput.PlaceholderText = "Paste key here..."
-KeyInput.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
-KeyInput.TextColor3 = Color3.new(1,1,1)
-KeyInput.TextSize = 14
-KeyInput.ClipsDescendants = true
-local KC = Instance.new("UICorner") KC.Parent = KeyInput KC.CornerRadius = UDim.new(0, 8)
-local KS = Instance.new("UIStroke") KS.Parent = KeyInput KS.Color = Color3.fromRGB(100, 60, 140) KS.Thickness = 1.5
+local Input = Instance.new("TextBox") Input.Parent = Main Input.Size = UDim2.new(0.8,0,0,45) Input.Position = UDim2.new(0.5,0,0,135) Input.AnchorPoint = Vector2.new(0.5,0) Input.BackgroundColor3 = Color3.fromRGB(45, 22, 70) Input.Font = Enum.Font.Gotham Input.Text = "" Input.PlaceholderText = "Paste Key..." Input.PlaceholderColor3 = Color3.fromRGB(150,150,150) Input.TextColor3 = Color3.new(1,1,1) Input.TextSize = 14 Input.ClipsDescendants = true
+local IC = Instance.new("UICorner") IC.Parent = Input IC.CornerRadius = UDim.new(0,8)
+local IS = Instance.new("UIStroke") IS.Parent = Input IS.Color = Color3.fromRGB(100, 60, 140) IS.Thickness = 1.5
 
--- 5. ЛОГИКА PLATOBOOST (API)
-local apiHost = "https://api.platoboost.com"
+-- =========================================================================
+-- LOGIC
+-- =========================================================================
 
--- Проверка хоста
-task.spawn(function()
-    local s, r = pcall(function()
-        return requestFunc({Url = apiHost .. "/public/connectivity", Method = "GET"})
-    end)
-    if s and r and r.StatusCode ~= 200 then
-        apiHost = "https://api.platoboost.net"
-    end
-end)
-
--- GET LINK FUNCTION
+-- Get Link
 GetKeyBtn.MouseButton1Click:Connect(function()
     GetKeyBtn.Text = "LOADING..."
-    
     task.spawn(function()
-        local identifier = hash(getHwid())
+        local body = HttpService:JSONEncode({
+            service = service,
+            identifier = hash(getHwid())
+        })
         
-        -- САМЫЙ ВАЖНЫЙ ЗАПРОС
-        local success, result = pcall(function()
-            return requestFunc({
-                Url = apiHost .. "/public/start",
-                Method = "POST",
-                Headers = {
-                    ["Content-Type"] = "application/json" -- ВАЖНО ДЛЯ DELTA
-                },
-                Body = HttpService:JSONEncode({
-                    service = service,
-                    identifier = identifier
-                })
-            })
-        end)
+        local result, err = makeRequest("/public/start", "POST", body)
         
-        if success and result then
+        if result then
             if result.StatusCode == 200 then
                 local data = HttpService:JSONDecode(result.Body)
                 if data.success then
                     if setclipboard then
                         setclipboard(data.data.url)
-                        notify("Copied!", "Link copied to clipboard", Color3.fromRGB(0, 255, 100))
+                        notify("Success", "Link copied!", Color3.fromRGB(0,255,100))
                         GetKeyBtn.Text = "COPIED!"
-                        task.wait(2)
-                        GetKeyBtn.Text = "GET KEY"
                     else
-                         notify("Success", "Link generated (No clipboard)", Color3.fromRGB(0, 255, 100))
-                         KeyInput.Text = data.data.url -- Вставляем ссылку в бокс если нет клипборда
+                        Input.Text = data.data.url
+                        notify("Success", "Link in text box (No clipboard)", Color3.fromRGB(0,255,100))
+                        GetKeyBtn.Text = "DONE"
                     end
                 else
-                    notify("API Error", data.message, Color3.fromRGB(255, 50, 50))
+                    notify("API Error", data.message, Color3.fromRGB(255,50,50))
                     GetKeyBtn.Text = "GET KEY"
                 end
             elseif result.StatusCode == 429 then
-                notify("Rate Limit", "Wait 15 seconds", Color3.fromRGB(255, 150, 0))
+                notify("Rate Limit", "Wait 15s", Color3.fromRGB(255,150,0))
                 GetKeyBtn.Text = "GET KEY"
             else
-                notify("HTTP Error", "Status: " .. tostring(result.StatusCode), Color3.fromRGB(255, 50, 50))
+                notify("HTTP Error", "Status: "..result.StatusCode, Color3.fromRGB(255,50,50))
                 GetKeyBtn.Text = "GET KEY"
             end
         else
-            notify("Connection Error", tostring(result), Color3.fromRGB(255, 50, 50))
+            notify("Connection Error", err, Color3.fromRGB(255,50,50))
             GetKeyBtn.Text = "GET KEY"
         end
+        task.wait(2)
+        if GetKeyBtn.Text ~= "GET KEY" then GetKeyBtn.Text = "GET KEY" end
     end)
 end)
 
--- VERIFY KEY FUNCTION
-local function verify(key)
-    if key == "" then return false, "Empty key" end
-    
-    local identifier = hash(getHwid())
-    -- nonce для безопасности
-    local nonce = ""
-    for i=1,16 do nonce=nonce..string.char(math.random(97,122)) end
-    
-    local url = apiHost .. "/public/whitelist/" .. service .. "?identifier=" .. identifier .. "&key=" .. key .. "&nonce=" .. nonce
-    
-    local s, r = pcall(function()
-        return requestFunc({
-            Url = url,
-            Method = "GET"
-        })
-    end)
-    
-    if s and r and r.StatusCode == 200 then
-        local data = HttpService:JSONDecode(r.Body)
-        if data.success and data.data.valid then
-            return true, "Valid"
-        else
-            return false, "Invalid Key"
-        end
-    elseif s and r and r.StatusCode == 429 then
-         return false, "Rate limit"
-    end
-    
-    return false, "Connection error"
-end
-
+-- Verify
 CheckKeyBtn.MouseButton1Click:Connect(function()
     CheckKeyBtn.Text = "CHECKING..."
     task.spawn(function()
-        local s, msg = verify(KeyInput.Text)
-        if s then
-            safeSave("MRHub_Key.txt", KeyInput.Text)
-            notify("Success!", "Script loading...", Color3.fromRGB(0, 255, 100))
-            CheckKeyBtn.Text = "LOADING..."
-            task.wait(1)
-            ScreenGui:Destroy()
-            
-            -- LOAD SCRIPT
-            loadstring(game:HttpGet('https://raw.githubusercontent.com/MineRoma/MRHUBNEW_UNI/refs/heads/main/nnnft'))()
+        local key = Input.Text
+        if #key < 5 then notify("Error", "Invalid Key", Color3.fromRGB(255,50,50)) CheckKeyBtn.Text = "CHECK KEY" return end
+        
+        local nonce = "" for i=1,16 do nonce=nonce..string.char(math.random(97,122)) end
+        local endpoint = "/public/whitelist/"..service.."?identifier="..hash(getHwid()).."&key="..key.."&nonce="..nonce
+        
+        local result, err = makeRequest(endpoint, "GET")
+        
+        if result and result.StatusCode == 200 then
+            local data = HttpService:JSONDecode(result.Body)
+            if data.success and data.data.valid then
+                pcall(function() writefile("MRHub_Key.txt", key) end)
+                notify("Success", "Valid Key!", Color3.fromRGB(0,255,100))
+                CheckKeyBtn.Text = "SUCCESS"
+                task.wait(1)
+                ScreenGui:Destroy()
+                loadstring(game:HttpGet('https://raw.githubusercontent.com/MineRoma/MRHUBNEW_UNI/refs/heads/main/nnnft'))()
+            else
+                notify("Error", "Invalid Key", Color3.fromRGB(255,50,50))
+                CheckKeyBtn.Text = "CHECK KEY"
+            end
         else
-            notify("Error", msg, Color3.fromRGB(255, 50, 50))
+            notify("Error", err or "Invalid Response", Color3.fromRGB(255,50,50))
             CheckKeyBtn.Text = "CHECK KEY"
         end
     end)
 end)
 
--- AUTO LOAD
+-- Auto Load
 task.spawn(function()
-    local saved = safeLoad("MRHub_Key.txt")
-    if saved then
-        notify("Auto-Load", "Checking saved key...", Color3.fromRGB(161, 46, 255))
-        local s, msg = verify(saved)
-        if s then
-            notify("Welcome", "Key verified!", Color3.fromRGB(0, 255, 100))
-            task.wait(1)
-            ScreenGui:Destroy()
-            loadstring(game:HttpGet('https://raw.githubusercontent.com/MineRoma/MRHUBNEW_UNI/refs/heads/main/nnnft'))()
-        else
-            KeyInput.Text = saved
-            notify("Expired", "Key expired", Color3.fromRGB(255, 150, 0))
+    if isfile and isfile("MRHub_Key.txt") then
+        local saved = readfile("MRHub_Key.txt")
+        if saved and #saved > 5 then
+            Input.Text = saved
+            notify("Auto-Load", "Key restored", Color3.fromRGB(161,46,255))
         end
     end
 end)
