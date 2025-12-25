@@ -1,0 +1,681 @@
+local service = "16451";
+local secret = "3fd9b8c7-1f40-41e6-afb7-b5d98a48d6e7";
+local useNonce = true;
+
+repeat task.wait(1) until game:IsLoaded() or game.Players.LocalPlayer;
+
+local requestSending = false;
+local fSetClipboard, fRequest, fStringChar, fToString, fStringSub, fOsTime, fMathRandom, fMathFloor, fGetHwid = setclipboard or toclipboard, request or http_request, string.char, tostring, string.sub, os.time, math.random, math.floor, gethwid or function() return game:GetService("Players").LocalPlayer.UserId end
+local cachedLink, cachedTime = "", 0;
+local HttpService = game:GetService("HttpService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+-- Detect mobile
+local isMobile = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
+
+-- Key save file with custom extension
+local KEY_FILE = "MRHub_Key.mrhk"
+
+-- Encode/Decode key for obfuscation
+local function encodeKey(key)
+    local encoded = ""
+    local salt = "MRHUB_SALT_2024"
+    for i = 1, #key do
+        local keyByte = string.byte(key, i)
+        local saltByte = string.byte(salt, ((i - 1) % #salt) + 1)
+        local newByte = (keyByte + saltByte + i * 3) % 256
+        encoded = encoded .. string.format("%02X", newByte)
+    end
+    return "MRHK_V1_" .. encoded .. "_" .. tostring(#key)
+end
+
+local function decodeKey(encoded)
+    if not encoded or not string.match(encoded, "^MRHK_V1_") then
+        return nil
+    end
+    
+    local parts = string.match(encoded, "^MRHK_V1_(.+)_(%d+)$")
+    if not parts then return nil end
+    
+    local hexData, lenStr = string.match(encoded, "^MRHK_V1_(.+)_(%d+)$")
+    if not hexData or not lenStr then return nil end
+    
+    local expectedLen = tonumber(lenStr)
+    local salt = "MRHUB_SALT_2024"
+    local decoded = ""
+    
+    local index = 1
+    for i = 1, expectedLen do
+        local hex = string.sub(hexData, (i-1)*2 + 1, i*2)
+        local byte = tonumber(hex, 16)
+        if not byte then return nil end
+        
+        local saltByte = string.byte(salt, ((i - 1) % #salt) + 1)
+        local originalByte = (byte - saltByte - i * 3) % 256
+        decoded = decoded .. string.char(originalByte)
+    end
+    
+    return decoded
+end
+
+-- Save key function
+local function saveKey(key)
+    pcall(function()
+        if writefile then
+            local encodedKey = encodeKey(key)
+            writefile(KEY_FILE, encodedKey)
+        end
+    end)
+end
+
+-- Load key function
+local function loadKey()
+    local success, result = pcall(function()
+        if readfile and isfile and isfile(KEY_FILE) then
+            local encodedKey = readfile(KEY_FILE)
+            return decodeKey(encodedKey)
+        end
+        return nil
+    end)
+    if success and result and result ~= "" then
+        return result
+    end
+    return nil
+end
+
+function lEncode(data)
+    return HttpService:JSONEncode(data)
+end
+
+function lDecode(data)
+    return HttpService:JSONDecode(data)
+end
+
+local function lDigest(input)
+    local inputStr = tostring(input)
+    local hash = {}
+    for i = 1, #inputStr do
+        table.insert(hash, string.byte(inputStr, i))
+    end
+    local hashHex = ""
+    for _, byte in ipairs(hash) do
+        hashHex = hashHex .. string.format("%02x", byte)
+    end
+    return hashHex
+end
+
+local host = "https://api.platoboost.com";
+pcall(function()
+    local hostResponse = fRequest({
+        Url = host .. "/public/connectivity",
+        Method = "GET"
+    });
+    if hostResponse.StatusCode ~= 200 then
+        host = "https://api.platoboost.net";
+    end
+end)
+
+function cacheLink()
+    if cachedTime + (10*60) < fOsTime() then
+        local response = fRequest({
+            Url = host .. "/public/start",
+            Method = "POST",
+            Body = lEncode({
+                service = service,
+                identifier = lDigest(fGetHwid())
+            }),
+            Headers = {
+                ["Content-Type"] = "application/json"
+            }
+        });
+
+        if response.StatusCode == 200 then
+            local decoded = lDecode(response.Body);
+            if decoded.success == true then
+                cachedLink = decoded.data.url;
+                cachedTime = fOsTime();
+                return true, cachedLink;
+            else
+                return false, decoded.message;
+            end
+        elseif response.StatusCode == 429 then
+            return false, "Rate limited, wait 20 seconds.";
+        end
+        return false, "Failed to get link.";
+    else
+        return true, cachedLink;
+    end
+end
+
+cacheLink();
+
+local generateNonce = function()
+    local str = ""
+    for _ = 1, 16 do
+        str = str .. fStringChar(fMathFloor(fMathRandom() * (122 - 97 + 1)) + 97)
+    end
+    return str
+end
+
+for _ = 1, 5 do
+    local oNonce = generateNonce();
+    task.wait(0.2)
+    if generateNonce() == oNonce then
+        error("Platoboost nonce error.");
+    end
+end
+
+local copyLink = function()
+    local success, link = cacheLink();
+    if success then
+        fSetClipboard(link);
+        return true
+    end
+    return false
+end
+
+local verifyKey = function(key)
+    if requestSending == true then
+        return false, "Request already sending, slow down.";
+    else
+        requestSending = true;
+    end
+
+    local nonce = generateNonce();
+    local endpoint = host .. "/public/whitelist/" .. fToString(service) .. "?identifier=" .. lDigest(fGetHwid()) .. "&key=" .. key;
+
+    if useNonce then
+        endpoint = endpoint .. "&nonce=" .. nonce;
+    end
+
+    local response = fRequest({
+        Url = endpoint,
+        Method = "GET",
+    });
+
+    requestSending = false;
+
+    if response.StatusCode == 200 then
+        local decoded = lDecode(response.Body);
+        if decoded.success == true then
+            if decoded.data.valid == true then
+                return true, "Key verified!";
+            else
+                return false, "Key is invalid or expired.";
+            end
+        else
+            return false, decoded.message;
+        end
+    elseif response.StatusCode == 429 then
+        return false, "Rate limited, wait 20 seconds.";
+    else
+        return false, "Server error, try again later.";
+    end
+end
+
+-- =========================================================================
+-- !!! GUI !!!
+-- =========================================================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "MRHubKeySystem"
+ScreenGui.Parent = game:GetService("CoreGui")
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.DisplayOrder = 999999
+ScreenGui.IgnoreGuiInset = true
+
+-- Notification container (right side)
+local NotifContainer = Instance.new("Frame")
+NotifContainer.Name = "NotifContainer"
+NotifContainer.Parent = ScreenGui
+NotifContainer.BackgroundTransparency = 1
+NotifContainer.Position = UDim2.new(1, -10, 1, -10)
+NotifContainer.Size = UDim2.new(0, 320, 0, 400)
+NotifContainer.AnchorPoint = Vector2.new(1, 1)
+
+local NotifLayout = Instance.new("UIListLayout")
+NotifLayout.Parent = NotifContainer
+NotifLayout.SortOrder = Enum.SortOrder.LayoutOrder
+NotifLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+NotifLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+NotifLayout.Padding = UDim.new(0, 8)
+
+-- Mobile notification size
+local notifWidth = isMobile and 260 or 310
+local notifHeight = isMobile and 65 or 75
+
+-- Notification function (smooth slide from right to left)
+local notifCount = 0
+local function showNotification(title, text, color, duration)
+    duration = duration or 3
+    color = color or Color3.fromRGB(161, 46, 255)
+    notifCount = notifCount + 1
+    
+    local NotifFrame = Instance.new("Frame")
+    NotifFrame.Name = "Notification" .. notifCount
+    NotifFrame.Parent = NotifContainer
+    NotifFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    NotifFrame.BackgroundTransparency = 1
+    NotifFrame.BorderSizePixel = 0
+    NotifFrame.Size = UDim2.new(0, notifWidth, 0, notifHeight)
+    NotifFrame.Position = UDim2.new(1, 50, 0, 0)
+    NotifFrame.LayoutOrder = -notifCount
+    NotifFrame.ClipsDescendants = true
+    
+    local NotifCorner = Instance.new("UICorner")
+    NotifCorner.CornerRadius = UDim.new(0, 10)
+    NotifCorner.Parent = NotifFrame
+    
+    local NotifStroke = Instance.new("UIStroke")
+    NotifStroke.Color = color
+    NotifStroke.Thickness = 2
+    NotifStroke.Transparency = 1
+    NotifStroke.Parent = NotifFrame
+    
+    local ColorBar = Instance.new("Frame")
+    ColorBar.Name = "ColorBar"
+    ColorBar.Parent = NotifFrame
+    ColorBar.BackgroundColor3 = color
+    ColorBar.BackgroundTransparency = 1
+    ColorBar.BorderSizePixel = 0
+    ColorBar.Position = UDim2.new(0, 0, 0, 0)
+    ColorBar.Size = UDim2.new(0, 4, 1, 0)
+    
+    local ColorBarCorner = Instance.new("UICorner")
+    ColorBarCorner.CornerRadius = UDim.new(0, 2)
+    ColorBarCorner.Parent = ColorBar
+    
+    local NotifTitle = Instance.new("TextLabel")
+    NotifTitle.Name = "Title"
+    NotifTitle.Parent = NotifFrame
+    NotifTitle.BackgroundTransparency = 1
+    NotifTitle.Position = UDim2.new(0, 14, 0, 10)
+    NotifTitle.Size = UDim2.new(1, -24, 0, 22)
+    NotifTitle.Font = Enum.Font.GothamBold
+    NotifTitle.Text = title
+    NotifTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    NotifTitle.TextTransparency = 1
+    NotifTitle.TextSize = isMobile and 15 or 17
+    NotifTitle.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local NotifText = Instance.new("TextLabel")
+    NotifText.Name = "Text"
+    NotifText.Parent = NotifFrame
+    NotifText.BackgroundTransparency = 1
+    NotifText.Position = UDim2.new(0, 14, 0, 34)
+    NotifText.Size = UDim2.new(1, -24, 0, 35)
+    NotifText.Font = Enum.Font.Gotham
+    NotifText.Text = text
+    NotifText.TextColor3 = Color3.fromRGB(190, 190, 190)
+    NotifText.TextTransparency = 1
+    NotifText.TextSize = isMobile and 12 or 14
+    NotifText.TextXAlignment = Enum.TextXAlignment.Left
+    NotifText.TextWrapped = true
+    NotifText.TextYAlignment = Enum.TextYAlignment.Top
+    
+    -- Smooth slide in from right to left
+    local tweenInfo = TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    
+    local tweenPos = TweenService:Create(NotifFrame, tweenInfo, {
+        Position = UDim2.new(0, 0, 0, 0),
+        BackgroundTransparency = 0.05
+    })
+    
+    local tweenStroke = TweenService:Create(NotifStroke, tweenInfo, {
+        Transparency = 0.3
+    })
+    
+    local tweenBar = TweenService:Create(ColorBar, tweenInfo, {
+        BackgroundTransparency = 0
+    })
+    
+    local tweenTitle = TweenService:Create(NotifTitle, tweenInfo, {
+        TextTransparency = 0
+    })
+    
+    local tweenText = TweenService:Create(NotifText, tweenInfo, {
+        TextTransparency = 0
+    })
+    
+    tweenPos:Play()
+    tweenStroke:Play()
+    tweenBar:Play()
+    tweenTitle:Play()
+    tweenText:Play()
+    
+    -- Smooth slide out to right after duration
+    task.delay(duration, function()
+        local tweenOutInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+        
+        local tweenOutPos = TweenService:Create(NotifFrame, tweenOutInfo, {
+            Position = UDim2.new(1, 50, 0, 0),
+            BackgroundTransparency = 1
+        })
+        
+        local tweenOutStroke = TweenService:Create(NotifStroke, tweenOutInfo, {
+            Transparency = 1
+        })
+        
+        local tweenOutBar = TweenService:Create(ColorBar, tweenOutInfo, {
+            BackgroundTransparency = 1
+        })
+        
+        local tweenOutTitle = TweenService:Create(NotifTitle, tweenOutInfo, {
+            TextTransparency = 1
+        })
+        
+        local tweenOutText = TweenService:Create(NotifText, tweenOutInfo, {
+            TextTransparency = 1
+        })
+        
+        tweenOutPos:Play()
+        tweenOutStroke:Play()
+        tweenOutBar:Play()
+        tweenOutTitle:Play()
+        tweenOutText:Play()
+        
+        tweenOutPos.Completed:Connect(function()
+            NotifFrame:Destroy()
+        end)
+    end)
+end
+
+-- Sizes for mobile/PC
+local containerWidth = isMobile and 330 or 420
+local containerHeight = isMobile and 300 or 340
+local buttonHeight = isMobile and 48 or 55
+local buttonWidth = isMobile and 290 or 360
+local textSize = isMobile and 16 or 20
+local titleSize = isMobile and 14 or 18
+
+-- Main container (centered)
+local MainContainer = Instance.new("Frame")
+MainContainer.Name = "MainContainer"
+MainContainer.Parent = ScreenGui
+MainContainer.BackgroundTransparency = 1
+MainContainer.Position = UDim2.new(0.5, 0, 0.5, 0)
+MainContainer.Size = UDim2.new(0, containerWidth, 0, containerHeight)
+MainContainer.AnchorPoint = Vector2.new(0.5, 0.5)
+
+-- =========================================================================
+-- !!! DRAGGABLE GUI !!!
+-- =========================================================================
+local dragging = false
+local dragInput
+local dragStart
+local startPos
+
+local function updateDrag(input)
+    local delta = input.Position - dragStart
+    local newPos = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    
+    local tweenInfo = TweenInfo.new(0.1, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    TweenService:Create(MainContainer, tweenInfo, {Position = newPos}):Play()
+end
+
+-- Header
+local Header = Instance.new("Frame")
+Header.Name = "Header"
+Header.Parent = MainContainer
+Header.BackgroundColor3 = Color3.fromRGB(85, 24, 134)
+Header.BorderSizePixel = 0
+Header.Position = UDim2.new(0, 0, 0, 0)
+Header.Size = UDim2.new(1, 0, 0, 55)
+
+-- Dragging events on Header
+Header.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainContainer.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+Header.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        updateDrag(input)
+    end
+end)
+
+local HeaderCorner = Instance.new("UICorner")
+HeaderCorner.CornerRadius = UDim.new(0, 10)
+HeaderCorner.Parent = Header
+
+local HeaderFix = Instance.new("Frame")
+HeaderFix.Name = "HeaderFix"
+HeaderFix.Parent = Header
+HeaderFix.BackgroundColor3 = Color3.fromRGB(85, 24, 134)
+HeaderFix.BorderSizePixel = 0
+HeaderFix.Position = UDim2.new(0, 0, 0.5, 0)
+HeaderFix.Size = UDim2.new(1, 0, 0.5, 0)
+
+local Title = Instance.new("TextLabel")
+Title.Name = "Title"
+Title.Parent = Header
+Title.BackgroundTransparency = 1
+Title.Position = UDim2.new(0, 0, 0, 0)
+Title.Size = UDim2.new(1, 0, 1, 0)
+Title.Font = Enum.Font.GothamBold
+Title.Text = "MINEROMA TEAM | KEY SYSTEM"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = titleSize
+
+-- Main panel
+local Main = Instance.new("Frame")
+Main.Name = "Main"
+Main.Parent = MainContainer
+Main.BackgroundColor3 = Color3.fromRGB(35, 18, 55)
+Main.BorderSizePixel = 0
+Main.Position = UDim2.new(0, 0, 0, 55)
+Main.Size = UDim2.new(1, 0, 1, -55)
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 10)
+MainCorner.Parent = Main
+
+local MainFix = Instance.new("Frame")
+MainFix.Name = "MainFix"
+MainFix.Parent = Main
+MainFix.BackgroundColor3 = Color3.fromRGB(35, 18, 55)
+MainFix.BorderSizePixel = 0
+MainFix.Position = UDim2.new(0, 0, 0, 0)
+MainFix.Size = UDim2.new(1, 0, 0, 12)
+
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color = Color3.fromRGB(161, 46, 255)
+MainStroke.Thickness = 2
+MainStroke.Parent = Main
+
+-- Get Key Button
+local GetKeyBtn = Instance.new("TextButton")
+GetKeyBtn.Name = "GetKey"
+GetKeyBtn.Parent = Main
+GetKeyBtn.BackgroundColor3 = Color3.fromRGB(161, 46, 255)
+GetKeyBtn.BorderSizePixel = 0
+GetKeyBtn.Position = UDim2.new(0.5, 0, 0, 20)
+GetKeyBtn.Size = UDim2.new(0, buttonWidth, 0, buttonHeight)
+GetKeyBtn.AnchorPoint = Vector2.new(0.5, 0)
+GetKeyBtn.Font = Enum.Font.GothamBold
+GetKeyBtn.Text = "GET KEY"
+GetKeyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+GetKeyBtn.TextSize = textSize
+GetKeyBtn.AutoButtonColor = true
+
+local GetKeyCorner = Instance.new("UICorner")
+GetKeyCorner.CornerRadius = UDim.new(0, 10)
+GetKeyCorner.Parent = GetKeyBtn
+
+-- TextBox with character limit and auto-sizing text
+local TextBox = Instance.new("TextBox")
+TextBox.Name = "KeyInput"
+TextBox.Parent = Main
+TextBox.BackgroundColor3 = Color3.fromRGB(55, 28, 85)
+TextBox.BorderSizePixel = 0
+TextBox.Position = UDim2.new(0.5, 0, 0, 20 + buttonHeight + 15)
+TextBox.Size = UDim2.new(0, buttonWidth, 0, buttonHeight)
+TextBox.AnchorPoint = Vector2.new(0.5, 0)
+TextBox.Font = Enum.Font.Gotham
+TextBox.PlaceholderText = "Enter your key here..."
+TextBox.PlaceholderColor3 = Color3.fromRGB(140, 140, 140)
+TextBox.Text = ""
+TextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+TextBox.TextSize = isMobile and 14 or 16
+TextBox.ClearTextOnFocus = false
+TextBox.ClipsDescendants = true
+TextBox.TextTruncate = Enum.TextTruncate.AtEnd
+
+local TextBoxCorner = Instance.new("UICorner")
+TextBoxCorner.CornerRadius = UDim.new(0, 10)
+TextBoxCorner.Parent = TextBox
+
+local TextBoxStroke = Instance.new("UIStroke")
+TextBoxStroke.Color = Color3.fromRGB(161, 46, 255)
+TextBoxStroke.Thickness = 1.5
+TextBoxStroke.Parent = TextBox
+
+-- Character limit and auto text size
+local maxChars = 30
+local baseTextSize = isMobile and 14 or 16
+local minTextSize = isMobile and 10 or 12
+
+TextBox:GetPropertyChangedSignal("Text"):Connect(function()
+    -- Character limit
+    if #TextBox.Text > maxChars then
+        TextBox.Text = string.sub(TextBox.Text, 1, maxChars)
+    end
+    
+    -- Auto-size text based on length
+    local textLength = #TextBox.Text
+    if textLength > 20 then
+        local scale = 1 - ((textLength - 20) / (maxChars - 20)) * 0.3
+        TextBox.TextSize = math.max(minTextSize, baseTextSize * scale)
+    else
+        TextBox.TextSize = baseTextSize
+    end
+end)
+
+-- Check Key Button
+local CheckKeyBtn = Instance.new("TextButton")
+CheckKeyBtn.Name = "CheckKey"
+CheckKeyBtn.Parent = Main
+CheckKeyBtn.BackgroundColor3 = Color3.fromRGB(161, 46, 255)
+CheckKeyBtn.BorderSizePixel = 0
+CheckKeyBtn.Position = UDim2.new(0.5, 0, 0, 20 + buttonHeight + 15 + buttonHeight + 15)
+CheckKeyBtn.Size = UDim2.new(0, buttonWidth, 0, buttonHeight)
+CheckKeyBtn.AnchorPoint = Vector2.new(0.5, 0)
+CheckKeyBtn.Font = Enum.Font.GothamBold
+CheckKeyBtn.Text = "CHECK KEY"
+CheckKeyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CheckKeyBtn.TextSize = textSize
+CheckKeyBtn.AutoButtonColor = true
+
+local CheckKeyCorner = Instance.new("UICorner")
+CheckKeyCorner.CornerRadius = UDim.new(0, 10)
+CheckKeyCorner.Parent = CheckKeyBtn
+
+-- Info text
+local InfoText = Instance.new("TextLabel")
+InfoText.Name = "Info"
+InfoText.Parent = Main
+InfoText.BackgroundTransparency = 1
+InfoText.Position = UDim2.new(0.5, 0, 1, -25)
+InfoText.Size = UDim2.new(1, -20, 0, 20)
+InfoText.AnchorPoint = Vector2.new(0.5, 1)
+InfoText.Font = Enum.Font.GothamMedium
+InfoText.Text = "t.me/minrteam"
+InfoText.TextColor3 = Color3.fromRGB(130, 130, 150)
+InfoText.TextSize = isMobile and 12 or 14
+
+-- =========================================================================
+-- !!! BUTTON CONNECTIONS !!!
+-- =========================================================================
+
+GetKeyBtn.MouseButton1Down:Connect(function()
+    GetKeyBtn.Text = "LOADING..."
+    
+    task.spawn(function()
+        local success = copyLink()
+        
+        if success then
+            showNotification("Link Copied!", "Open browser and paste the link", Color3.fromRGB(0, 255, 100), 4)
+            GetKeyBtn.Text = "COPIED!"
+            task.wait(2)
+            GetKeyBtn.Text = "GET KEY"
+        else
+            showNotification("Error", "Failed to get link. Try again.", Color3.fromRGB(255, 50, 50), 3)
+            GetKeyBtn.Text = "GET KEY"
+        end
+    end)
+end)
+
+CheckKeyBtn.MouseButton1Down:Connect(function()
+    local key = TextBox.Text
+    
+    if key == "" or key == nil then
+        showNotification("Error", "Please enter a key first!", Color3.fromRGB(255, 50, 50), 3)
+        return
+    end
+    
+    CheckKeyBtn.Text = "CHECKING..."
+    
+    task.spawn(function()
+        local success, message = verifyKey(key)
+        
+        if success then
+            -- Save valid key with encryption
+            saveKey(key)
+            
+            showNotification("Success!", "Key verified! Loading script...", Color3.fromRGB(0, 255, 100), 3)
+            CheckKeyBtn.Text = "LOADING..."
+            
+            task.wait(1.5)
+            ScreenGui:Destroy()
+            loadstring(game:HttpGet('https://raw.githubusercontent.com/MineRoma/MRHUBNEW_UNI/refs/heads/main/nnnft'))()
+        else
+            showNotification("Invalid Key", message, Color3.fromRGB(255, 50, 50), 4)
+            CheckKeyBtn.Text = "CHECK KEY"
+        end
+    end)
+end)
+
+-- =========================================================================
+-- !!! CHECK SAVED KEY ON START !!!
+-- =========================================================================
+task.spawn(function()
+    task.wait(0.5)
+    
+    local savedKey = loadKey()
+    
+    if savedKey and savedKey ~= "" then
+        showNotification("Checking Key", "Verifying saved key...", Color3.fromRGB(161, 46, 255), 2)
+        
+        task.wait(0.5)
+        
+        local success, message = verifyKey(savedKey)
+        
+        if success then
+            showNotification("Welcome Back!", "Key still valid. Loading...", Color3.fromRGB(0, 255, 100), 2)
+            
+            task.wait(1.5)
+            ScreenGui:Destroy()
+            loadstring(game:HttpGet('https://raw.githubusercontent.com/MineRoma/MRHUBNEW_UNI/refs/heads/main/nnnft'))()
+        else
+            showNotification("Key Expired", "Your saved key has expired. Get a new one!", Color3.fromRGB(255, 150, 0), 4)
+            TextBox.Text = savedKey
+        end
+    else
+        showNotification("MR HUB", "Welcome! Get your key to continue.", Color3.fromRGB(161, 46, 255), 4)
+    end
+end)
