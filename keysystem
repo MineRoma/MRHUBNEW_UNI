@@ -1,147 +1,130 @@
--- ТЕСТОВЫЙ СКРИПТ ДЛЯ DELTA
+-- ТЕСТ PLATOBOOST API ДЛЯ DELTA
 repeat task.wait(1) until game:IsLoaded()
 task.wait(1)
 
-local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
+
+local service = "16451" -- ЗАМЕНИ НА СВОЙ!
 
 local function testNotify(title, text)
     pcall(function()
         game:GetService("StarterGui"):SetCore("SendNotification", {
             Title = title,
-            Text = text,
-            Duration = 5
+            Text = tostring(text),
+            Duration = 8
         })
     end)
-    print("[TEST] " .. title .. ": " .. text)
+    print("[TEST] " .. title .. ": " .. tostring(text))
 end
 
--- Тест 1: Executor
-local executorName = "Unknown"
-pcall(function()
-    if identifyexecutor then
-        executorName = identifyexecutor()
-    elseif getexecutorname then
-        executorName = getexecutorname()
-    end
-end)
-testNotify("Executor", executorName)
+-- Получаем request функцию
+local fRequest = request or http_request or (http and http.request)
 
--- Тест 2: Request функция
-local requestFunc = nil
-local requestName = "NONE"
-
-if request then
-    requestFunc = request
-    requestName = "request"
-elseif http_request then
-    requestFunc = http_request
-    requestName = "http_request"
-elseif http and http.request then
-    requestFunc = http.request
-    requestName = "http.request"
-elseif syn and syn.request then
-    requestFunc = syn.request
-    requestName = "syn.request"
+if not fRequest then
+    testNotify("ERROR", "No request function!")
+    return
 end
-testNotify("Request", requestName)
 
--- Тест 3: Clipboard
-local clipboardName = "NONE"
-if setclipboard then
-    clipboardName = "setclipboard"
-elseif toclipboard then
-    clipboardName = "toclipboard"
-end
-testNotify("Clipboard", clipboardName)
-
--- Тест 4: HWID
-local hwidFunc = nil
-local hwidName = "NONE"
+-- Получаем HWID
+local hwid = "unknown"
 if gethwid then
-    hwidName = "gethwid"
+    hwid = tostring(gethwid())
 elseif getdeviceid then
-    hwidName = "getdeviceid"
+    hwid = tostring(getdeviceid())
 elseif getandroidid then
-    hwidName = "getandroidid"
+    hwid = tostring(getandroidid())
+else
+    hwid = tostring(game:GetService("Players").LocalPlayer.UserId)
 end
-testNotify("HWID", hwidName)
 
--- Тест 5: File system
-local fileName = "NONE"
-if writefile and readfile and isfile then
-    fileName = "writefile+readfile+isfile"
-elseif writefile then
-    fileName = "only writefile"
+testNotify("HWID", string.sub(hwid, 1, 20) .. "...")
+
+-- Digest функция
+local function lDigest(input)
+    local inputStr = tostring(input)
+    local hashHex = ""
+    for i = 1, #inputStr do
+        hashHex = hashHex .. string.format("%02x", string.byte(inputStr, i))
+    end
+    return hashHex
 end
-testNotify("Files", fileName)
 
--- Тест 6: HTTP запрос
-if requestFunc then
-    local success, result = pcall(function()
-        local response = requestFunc({
-            Url = "https://httpbin.org/get",
-            Method = "GET"
-        })
-        return response
-    end)
-    
-    if success and result then
-        testNotify("HTTP Test", "Status: " .. tostring(result.StatusCode))
-    else
-        testNotify("HTTP Test", "FAILED: " .. tostring(result))
+local identifier = lDigest(hwid)
+testNotify("Identifier", string.sub(identifier, 1, 20) .. "...")
+
+-- Тест 1: Connectivity
+testNotify("Test 1", "Checking connectivity...")
+
+local host = "https://api.platoboost.com"
+local connSuccess, connResult = pcall(function()
+    return fRequest({
+        Url = host .. "/public/connectivity",
+        Method = "GET"
+    })
+end)
+
+if connSuccess and connResult then
+    testNotify("Connectivity", "Status: " .. tostring(connResult.StatusCode))
+    if connResult.StatusCode ~= 200 then
+        host = "https://api.platoboost.net"
+        testNotify("Host", "Switched to .net")
     end
 else
-    testNotify("HTTP Test", "No request function!")
+    testNotify("Connectivity", "FAILED: " .. tostring(connResult))
 end
 
--- Тест 7: GUI
-local guiSuccess = false
-local guiLocation = "NONE"
+-- Тест 2: Start (получение ссылки)
+testNotify("Test 2", "Getting link...")
 
-pcall(function()
-    local sg = Instance.new("ScreenGui")
-    sg.Name = "TestGUI"
-    sg.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
-    guiSuccess = true
-    guiLocation = "PlayerGui"
-    
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 200, 0, 100)
-    frame.Position = UDim2.new(0.5, -100, 0.5, -50)
-    frame.BackgroundColor3 = Color3.fromRGB(85, 24, 134)
-    frame.Parent = sg
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 10)
-    corner.Parent = frame
-    
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.Text = "DELTA TEST OK!\n" .. executorName
-    label.TextColor3 = Color3.fromRGB(255, 255, 255)
-    label.Font = Enum.Font.GothamBold
-    label.TextSize = 18
-    label.Parent = frame
-    
-    task.delay(5, function()
-        sg:Destroy()
-    end)
+local requestBody = HttpService:JSONEncode({
+    service = service,
+    identifier = identifier
+})
+
+testNotify("Body", string.sub(requestBody, 1, 50))
+
+local startSuccess, startResult = pcall(function()
+    return fRequest({
+        Url = host .. "/public/start",
+        Method = "POST",
+        Body = requestBody,
+        Headers = {
+            ["Content-Type"] = "application/json"
+        }
+    })
 end)
 
-if not guiSuccess then
-    pcall(function()
-        local sg = Instance.new("ScreenGui")
-        sg.Name = "TestGUI"
-        sg.Parent = game:GetService("CoreGui")
-        guiSuccess = true
-        guiLocation = "CoreGui"
-        sg:Destroy()
-    end)
+if startSuccess and startResult then
+    testNotify("Start Status", tostring(startResult.StatusCode))
+    
+    if startResult.Body then
+        testNotify("Body Length", tostring(#startResult.Body))
+        
+        local decodeSuccess, decoded = pcall(function()
+            return HttpService:JSONDecode(startResult.Body)
+        end)
+        
+        if decodeSuccess and decoded then
+            testNotify("Success Field", tostring(decoded.success))
+            
+            if decoded.success == true then
+                if decoded.data and decoded.data.url then
+                    testNotify("URL", string.sub(decoded.data.url, 1, 40) .. "...")
+                    testNotify("RESULT", "ALL WORKING!")
+                else
+                    testNotify("ERROR", "No URL in data")
+                    testNotify("Data", tostring(decoded.data))
+                end
+            else
+                testNotify("API Error", tostring(decoded.message))
+            end
+        else
+            testNotify("Decode Error", tostring(decoded))
+            testNotify("Raw Body", string.sub(startResult.Body, 1, 100))
+        end
+    else
+        testNotify("ERROR", "No body in response")
+    end
+else
+    testNotify("Start FAILED", tostring(startResult))
 end
-
-testNotify("GUI", guiLocation .. " - " .. tostring(guiSuccess))
-
-testNotify("DONE", "Check all results above!")
