@@ -1,6 +1,6 @@
 local service = "16451";
 local secret = "3fd9b8c7-1f40-41e6-afb7-b5d98a48d6e7";
-local useNonce = true
+local useNonce = true -- 1212
 
 repeat task.wait(1) until game:IsLoaded() or game.Players.LocalPlayer
 
