@@ -153,7 +153,7 @@ local mainW, mainH = (isSmall and 330 or 420), (isSmall and 300 or 340)
 local btnW, btnH = (isSmall and 290 or 360), (isSmall and 48 or 55)
 
 -- =========================================================================
--- SMOOTH NOTIFICATION SYSTEM (NO LISTLAYOUT)
+-- SMOOTH NOTIFICATION SYSTEM (TWEEN BASED)
 -- =========================================================================
 local NotifContainer = Instance.new("Frame")
 NotifContainer.Parent = ScreenGui
@@ -162,15 +162,15 @@ NotifContainer.Position = UDim2.new(1, -10, 1, -10)
 NotifContainer.Size = UDim2.new(0, 320, 0, 600)
 NotifContainer.AnchorPoint = Vector2.new(1, 1)
 
-local activeNotifs = {} -- Table to store active notification frames
+local activeNotifications = {} -- Store tables: {Frame = frame, TargetY = y}
 
-local function rearrangeNotifs()
-    for i, frame in ipairs(activeNotifs) do
-        -- Calculate position: Stack from bottom up
-        -- Index 1 is at bottom (0), Index 2 is above it, etc.
-        local yOffset = -( (i - 1) * (notifH + 8) )
+local function updateNotificationPositions()
+    for i, data in ipairs(activeNotifications) do
+        local frame = data.Frame
+        -- Calculate position from bottom: Index 1 is bottom, Index 2 is above it
+        local newYOffset = -((i - 1) * (notifH + 8)) - notifH
         
-        local targetPos = UDim2.new(1, 0, 1, yOffset - notifH) -- Anchor 1,1
+        local targetPos = UDim2.new(1, 0, 1, newYOffset)
         
         TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
             Position = targetPos
@@ -189,17 +189,10 @@ local function showNotification(title, text, color, duration)
     Frame.BackgroundTransparency = 0.05
     Frame.BorderSizePixel = 0
     Frame.Size = UDim2.new(0, notifW, 0, notifH)
-    Frame.AnchorPoint = Vector2.new(1, 0) -- Anchor Right Top (relative to container logic)
+    -- Start offscreen to the right, vertical position will be handled by logic
+    Frame.Position = UDim2.new(1, notifW + 20, 1, -notifH) 
     Frame.ClipsDescendants = true
     
-    -- Start Position (Off screen to the right)
-    -- We calculate where it SHOULD be in the stack, but offset X
-    local targetIndex = 1 -- Newest goes to bottom
-    local yOffset = 0 -- Bottom position
-    
-    -- Shift existing up logic is handled by inserting at 1 and rearranging
-    Frame.Position = UDim2.new(1, notifW + 20, 1, -notifH) 
-
     local Corner = Instance.new("UICorner") Corner.CornerRadius = UDim.new(0, 10) Corner.Parent = Frame
     local Stroke = Instance.new("UIStroke") Stroke.Color = color Stroke.Thickness = 2 Stroke.Transparency = 0.3 Stroke.Parent = Frame
     local Bar = Instance.new("Frame") Bar.Parent = Frame Bar.BackgroundColor3 = color Bar.BorderSizePixel = 0 Bar.Size = UDim2.new(0, 4, 1, 0)
@@ -207,43 +200,49 @@ local function showNotification(title, text, color, duration)
     local T = Instance.new("TextLabel") T.Parent = Frame T.BackgroundTransparency = 1 T.Position = UDim2.new(0, 14, 0, 10) T.Size = UDim2.new(1, -24, 0, 22) T.Font = Enum.Font.LuckiestGuy T.Text = title T.TextColor3 = Color3.new(1,1,1) T.TextSize = isSmall and 15 or 17 T.TextXAlignment = Enum.TextXAlignment.Left
     local B = Instance.new("TextLabel") B.Parent = Frame B.BackgroundTransparency = 1 B.Position = UDim2.new(0, 14, 0, 34) B.Size = UDim2.new(1, -24, 0, 35) B.Font = Enum.Font.Gotham B.Text = text B.TextColor3 = Color3.fromRGB(190, 190, 190) B.TextSize = isSmall and 12 or 14 B.TextXAlignment = Enum.TextXAlignment.Left B.TextWrapped = true B.TextYAlignment = Enum.TextYAlignment.Top
 
-    -- Add to table at the start (Stack behavior)
-    table.insert(activeNotifs, 1, Frame)
+    -- Insert at the beginning (index 1 = newest = bottom)
+    table.insert(activeNotifications, 1, {Frame = Frame})
     
-    -- Slide In
-    local targetPos = UDim2.new(1, 0, 1, -notifH) -- Bottom slot
+    -- Animate In (Horizontal)
+    -- First, calculate where it should be vertically
+    local targetY = -notifH
+    Frame.Position = UDim2.new(1, notifW + 20, 1, targetY) -- Set correct Y immediately
+    
     TweenService:Create(Frame, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-        Position = targetPos
+        Position = UDim2.new(1, 0, 1, targetY)
     }):Play()
     
-    -- Move others up
-    rearrangeNotifs()
+    -- Update others to move up
+    updateNotificationPositions()
     
     -- Remove logic
     task.delay(duration, function()
         if Frame and Frame.Parent then
             -- Slide Out
+            local currentY = Frame.Position.Y.Offset
             local tweenOut = TweenService:Create(Frame, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {
-                Position = UDim2.new(1, notifW + 20, Frame.Position.Y.Scale, Frame.Position.Y.Offset)
+                Position = UDim2.new(1, notifW + 20, 1, currentY)
             })
             tweenOut:Play()
+            
             tweenOut.Completed:Connect(function()
-                -- Find index to remove
-                for i, f in ipairs(activeNotifs) do
-                    if f == Frame then
-                        table.remove(activeNotifs, i)
+                -- Remove from table
+                for i, data in ipairs(activeNotifications) do
+                    if data.Frame == Frame then
+                        table.remove(activeNotifications, i)
                         break
                     end
                 end
                 Frame:Destroy()
-                rearrangeNotifs() -- Slide others down to fill gap
+                -- Slide remaining notifications down smoothly
+                updateNotificationPositions()
             end)
         end
     end)
 end
 
 -- =========================================================================
--- MAIN GUI (FIXED BORDER)
+-- MAIN GUI (SEAMLESS BORDER FIX)
 -- =========================================================================
 local MainContainer = Instance.new("Frame")
 MainContainer.Parent = ScreenGui
@@ -252,29 +251,40 @@ MainContainer.Position = UDim2.new(0.5, 0, 0.5, 0)
 MainContainer.Size = UDim2.new(0, mainW, 0, mainH)
 MainContainer.AnchorPoint = Vector2.new(0.5, 0.5)
 
--- Unified Background (Holds the Stroke)
-local Background = Instance.new("Frame")
-Background.Name = "Background"
-Background.Parent = MainContainer
-Background.Size = UDim2.new(1, 0, 1, 0)
-Background.BackgroundColor3 = Color3.fromRGB(35, 18, 55) -- Main Body Color
-Background.BorderSizePixel = 0
+-- 1. BASE FRAME (Dark Purple, Rounded Bottom, Main Stroke)
+-- This acts as the "Body" and the "Outline Holder"
+local BaseFrame = Instance.new("Frame")
+BaseFrame.Name = "BaseFrame"
+BaseFrame.Parent = MainContainer
+BaseFrame.Size = UDim2.new(1, 0, 1, 0)
+BaseFrame.BackgroundColor3 = Color3.fromRGB(35, 18, 55)
+BaseFrame.BorderSizePixel = 0
 
-local BgCorner = Instance.new("UICorner") BgCorner.CornerRadius = UDim.new(0, 10) BgCorner.Parent = Background
-local BgStroke = Instance.new("UIStroke") BgStroke.Color = Color3.fromRGB(161, 46, 255) BgStroke.Thickness = 2 BgStroke.Parent = Background
+local BaseCorner = Instance.new("UICorner") BaseCorner.CornerRadius = UDim.new(0, 10) BaseCorner.Parent = BaseFrame
+local BaseStroke = Instance.new("UIStroke") BaseStroke.Color = Color3.fromRGB(161, 46, 255) BaseStroke.Thickness = 2 BaseStroke.Parent = BaseFrame
 
--- Header (Inside Background, Top)
+-- 2. HEADER (Light Purple, Rounded Top)
 local Header = Instance.new("Frame")
 Header.Name = "Header"
-Header.Parent = Background
+Header.Parent = BaseFrame
 Header.BackgroundColor3 = Color3.fromRGB(85, 24, 134)
 Header.Size = UDim2.new(1, 0, 0, 55)
 Header.BorderSizePixel = 0
-Header.ZIndex = 2 -- Sit on top of background
+Header.ZIndex = 2 -- Sit on top of BaseFrame
 
-local HCorner = Instance.new("UICorner") HCorner.CornerRadius = UDim.new(0, 10) HCorner.Parent = Header
--- Hides bottom corners of Header to merge with body
-local HFix = Instance.new("Frame") HFix.Parent = Header HFix.BackgroundColor3 = Color3.fromRGB(85, 24, 134) HFix.BorderSizePixel = 0 HFix.Position = UDim2.new(0,0,0.5,0) HFix.Size = UDim2.new(1,0,0.5,0) HFix.ZIndex = 2
+local HeaderCorner = Instance.new("UICorner") HeaderCorner.CornerRadius = UDim.new(0, 10) HeaderCorner.Parent = Header
+
+-- 3. THE MAGIC FIX (Square Joint)
+-- A Frame inside the Header that covers its bottom rounded corners
+-- And covers the BaseFrame's top area
+local HeaderFix = Instance.new("Frame")
+HeaderFix.Name = "HeaderFix"
+HeaderFix.Parent = Header
+HeaderFix.BackgroundColor3 = Color3.fromRGB(85, 24, 134) -- Same as Header
+HeaderFix.BorderSizePixel = 0
+HeaderFix.Position = UDim2.new(0, 0, 0.5, 0) -- Start at middle
+HeaderFix.Size = UDim2.new(1, 0, 0.5, 0) -- Cover bottom half
+HeaderFix.ZIndex = 2
 
 local Title = Instance.new("TextLabel")
 Title.Parent = Header
@@ -283,7 +293,7 @@ Title.Size = UDim2.new(1, 0, 1, 0)
 Title.Font = Enum.Font.LuckiestGuy
 Title.Text = "MINEROMA TEAM | KEY SYSTEM"
 Title.TextColor3 = Color3.new(1,1,1)
-Title.TextSize = isSmall and 14 or 18
+Title.TextSize = titleSize
 Title.ZIndex = 3
 
 -- Dragging
@@ -294,7 +304,7 @@ Header.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.M
 
 -- Content Container
 local Content = Instance.new("Frame")
-Content.Parent = Background
+Content.Parent = BaseFrame
 Content.BackgroundTransparency = 1
 Content.Position = UDim2.new(0, 0, 0, 55)
 Content.Size = UDim2.new(1, 0, 1, -55)
