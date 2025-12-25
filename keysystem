@@ -19,30 +19,72 @@ local ExecutorSupport = {
 local function detectExecutor()
     -- Detect executor name
     if identifyexecutor then
-        ExecutorSupport.name = identifyexecutor()
+        local success, result = pcall(identifyexecutor)
+        if success then
+            ExecutorSupport.name = result
+        end
     elseif getexecutorname then
-        ExecutorSupport.name = getexecutorname()
-    elseif KRNL_LOADED then
-        ExecutorSupport.name = "KRNL"
-    elseif syn and syn.protect_gui then
-        ExecutorSupport.name = "Synapse X"
-    elseif fluxus then
-        ExecutorSupport.name = "Fluxus"
-    elseif getgenv().executor_name then
-        ExecutorSupport.name = getgenv().executor_name
+        local success, result = pcall(getexecutorname)
+        if success then
+            ExecutorSupport.name = result
+        end
     end
     
-    -- Request function
+    -- Specific executor detection
+    if ExecutorSupport.name == "Unknown" then
+        if syn and syn.request then
+            ExecutorSupport.name = "Synapse X"
+        elseif KRNL_LOADED then
+            ExecutorSupport.name = "KRNL"
+        elseif fluxus and fluxus.request then
+            ExecutorSupport.name = "Fluxus"
+        elseif getgenv().Xeno then
+            ExecutorSupport.name = "Xeno"
+        elseif SENTINEL_LOADED then
+            ExecutorSupport.name = "Sentinel"
+        elseif getgenv().ScriptWare then
+            ExecutorSupport.name = "Script-Ware"
+        elseif getgenv().Valyse then
+            ExecutorSupport.name = "Valyse"
+        elseif getgenv().Celery then
+            ExecutorSupport.name = "Celery"
+        elseif getgenv().Arceus then
+            ExecutorSupport.name = "Arceus X"
+        elseif getgenv().Codex then
+            ExecutorSupport.name = "Codex"
+        elseif getgenv().evon then
+            ExecutorSupport.name = "Evon"
+        elseif getgenv().Hydrogen then
+            ExecutorSupport.name = "Hydrogen"
+        elseif getgenv().Comet then
+            ExecutorSupport.name = "Comet"
+        end
+    end
+    
+    -- Request function (order matters - most reliable first)
     if syn and syn.request then
         ExecutorSupport.request = syn.request
+    elseif fluxus and fluxus.request then
+        ExecutorSupport.request = fluxus.request
+    elseif getgenv().Xeno and getgenv().Xeno.request then
+        ExecutorSupport.request = getgenv().Xeno.request
     elseif http and http.request then
         ExecutorSupport.request = http.request
     elseif request then
         ExecutorSupport.request = request
     elseif http_request then
         ExecutorSupport.request = http_request
-    elseif fluxus and fluxus.request then
-        ExecutorSupport.request = fluxus.request
+    elseif HttpPost and HttpGet then
+        -- Fallback for some executors
+        ExecutorSupport.request = function(data)
+            if data.Method == "GET" then
+                local body = HttpGet(data.Url)
+                return {StatusCode = 200, Body = body}
+            elseif data.Method == "POST" then
+                local body = HttpPost(data.Url, data.Body)
+                return {StatusCode = 200, Body = body}
+            end
+        end
     end
     
     -- Clipboard function
@@ -50,6 +92,10 @@ local function detectExecutor()
         ExecutorSupport.clipboard = setclipboard
     elseif toclipboard then
         ExecutorSupport.clipboard = toclipboard
+    elseif syn and syn.write_clipboard then
+        ExecutorSupport.clipboard = syn.write_clipboard
+    elseif getgenv().Xeno and getgenv().Xeno.setclipboard then
+        ExecutorSupport.clipboard = getgenv().Xeno.setclipboard
     elseif Clipboard and Clipboard.set then
         ExecutorSupport.clipboard = Clipboard.set
     end
@@ -63,6 +109,18 @@ local function detectExecutor()
         ExecutorSupport.hwid = getandroidid
     elseif syn and syn.hw_id then
         ExecutorSupport.hwid = function() return syn.hw_id end
+    elseif getgenv().Xeno and getgenv().Xeno.getDeviceId then
+        ExecutorSupport.hwid = getgenv().Xeno.getDeviceId
+    elseif identifyexecutor and game:GetService("RbxAnalyticsService") then
+        ExecutorSupport.hwid = function()
+            local success, result = pcall(function()
+                return game:GetService("RbxAnalyticsService"):GetClientId()
+            end)
+            if success and result then
+                return result
+            end
+            return tostring(game:GetService("Players").LocalPlayer.UserId)
+        end
     else
         ExecutorSupport.hwid = function()
             return tostring(game:GetService("Players").LocalPlayer.UserId)
@@ -72,12 +130,20 @@ local function detectExecutor()
     -- File functions
     if writefile then
         ExecutorSupport.writefile = writefile
+    elseif getgenv().Xeno and getgenv().Xeno.writefile then
+        ExecutorSupport.writefile = getgenv().Xeno.writefile
     end
+    
     if readfile then
         ExecutorSupport.readfile = readfile
+    elseif getgenv().Xeno and getgenv().Xeno.readfile then
+        ExecutorSupport.readfile = getgenv().Xeno.readfile
     end
+    
     if isfile then
         ExecutorSupport.isfile = isfile
+    elseif getgenv().Xeno and getgenv().Xeno.isfile then
+        ExecutorSupport.isfile = getgenv().Xeno.isfile
     end
     
     -- GUI Parent
@@ -88,9 +154,13 @@ local function detectExecutor()
         ExecutorSupport.guiParent = CoreGui
         ExecutorSupport.protectGui = syn.protect_gui
     elseif gethui then
-        ExecutorSupport.guiParent = gethui()
+        local success, result = pcall(gethui)
+        if success and result then
+            ExecutorSupport.guiParent = result
+        else
+            ExecutorSupport.guiParent = CoreGui
+        end
     else
-        -- Try CoreGui first
         local success = pcall(function()
             local test = Instance.new("ScreenGui")
             test.Parent = CoreGui
@@ -114,23 +184,30 @@ local Executor = detectExecutor()
 -- =========================================================================
 local function safeRequest(options)
     if not Executor.request then
+        warn("[MR HUB] No request function available!")
         return nil
     end
+    
     local success, result = pcall(function()
         return Executor.request(options)
     end)
+    
     if success then
         return result
+    else
+        warn("[MR HUB] Request failed: " .. tostring(result))
+        return nil
     end
-    return nil
 end
 
 local function safeClipboard(text)
     if Executor.clipboard then
-        pcall(function()
+        local success, err = pcall(function()
             Executor.clipboard(text)
         end)
+        return success
     end
+    return false
 end
 
 local function safeGetHwid()
@@ -145,10 +222,12 @@ end
 
 local function safeWriteFile(name, content)
     if Executor.writefile then
-        pcall(function()
+        local success, err = pcall(function()
             Executor.writefile(name, content)
         end)
+        return success
     end
+    return false
 end
 
 local function safeReadFile(name)
@@ -167,18 +246,6 @@ local function safeReadFile(name)
         end
     end
     return nil
-end
-
-local function safeIsFile(name)
-    if Executor.isfile then
-        local success, result = pcall(function()
-            return Executor.isfile(name)
-        end)
-        if success then
-            return result
-        end
-    end
-    return false
 end
 
 -- =========================================================================
@@ -213,6 +280,7 @@ local KEY_FILE = "MRHub_Key.mrhk"
 -- KEY ENCRYPTION
 -- =========================================================================
 local function encodeKey(key)
+    if not key or key == "" then return "" end
     local encoded = ""
     local salt = "MRHUB_SALT_2024"
     for i = 1, #key do
@@ -225,7 +293,7 @@ local function encodeKey(key)
 end
 
 local function decodeKey(encoded)
-    if not encoded or type(encoded) ~= "string" then
+    if not encoded or type(encoded) ~= "string" or encoded == "" then
         return nil
     end
     if not string.match(encoded, "^MRHK_V1_") then
@@ -238,7 +306,7 @@ local function decodeKey(encoded)
     end
     
     local expectedLen = tonumber(lenStr)
-    if not expectedLen then
+    if not expectedLen or expectedLen <= 0 then
         return nil
     end
     
@@ -246,7 +314,14 @@ local function decodeKey(encoded)
     local decoded = ""
     
     for i = 1, expectedLen do
-        local hex = string.sub(hexData, (i - 1) * 2 + 1, i * 2)
+        local startIdx = (i - 1) * 2 + 1
+        local endIdx = i * 2
+        local hex = string.sub(hexData, startIdx, endIdx)
+        
+        if #hex ~= 2 then
+            return nil
+        end
+        
         local byte = tonumber(hex, 16)
         if not byte then
             return nil
@@ -261,12 +336,13 @@ local function decodeKey(encoded)
 end
 
 local function saveKey(key)
-    safeWriteFile(KEY_FILE, encodeKey(key))
+    if not key or key == "" then return false end
+    return safeWriteFile(KEY_FILE, encodeKey(key))
 end
 
 local function loadKey()
     local encoded = safeReadFile(KEY_FILE)
-    if encoded then
+    if encoded and encoded ~= "" then
         return decodeKey(encoded)
     end
     return nil
@@ -286,55 +362,67 @@ end
 
 local host = "https://api.platoboost.com"
 
-pcall(function()
+-- Check connectivity
+task.spawn(function()
     local response = safeRequest({
         Url = host .. "/public/connectivity",
         Method = "GET"
     })
-    if response and response.StatusCode ~= 200 then
+    if not response or response.StatusCode ~= 200 then
         host = "https://api.platoboost.net"
     end
 end)
 
 local function cacheLink()
-    if cachedTime + 600 < os.time() then
-        local response = safeRequest({
-            Url = host .. "/public/start",
-            Method = "POST",
-            Body = HttpService:JSONEncode({
-                service = service,
-                identifier = lDigest(safeGetHwid())
-            }),
-            Headers = {
-                ["Content-Type"] = "application/json"
-            }
-        })
+    if cachedLink ~= "" and cachedTime + 600 > os.time() then
+        return true, cachedLink
+    end
+    
+    local hwid = safeGetHwid()
+    local identifier = lDigest(hwid)
+    
+    local response = safeRequest({
+        Url = host .. "/public/start",
+        Method = "POST",
+        Body = HttpService:JSONEncode({
+            service = service,
+            identifier = identifier
+        }),
+        Headers = {
+            ["Content-Type"] = "application/json"
+        }
+    })
 
-        if response and response.StatusCode == 200 then
-            local success, decoded = pcall(function()
-                return HttpService:JSONDecode(response.Body)
-            end)
-            if success and decoded.success == true then
+    if not response then
+        return false, "Request failed - check executor"
+    end
+    
+    if response.StatusCode == 200 then
+        local success, decoded = pcall(function()
+            return HttpService:JSONDecode(response.Body)
+        end)
+        
+        if success and decoded then
+            if decoded.success == true and decoded.data and decoded.data.url then
                 cachedLink = decoded.data.url
                 cachedTime = os.time()
                 return true, cachedLink
-            elseif success then
-                return false, decoded.message or "Unknown error"
+            elseif decoded.message then
+                return false, decoded.message
             end
-        elseif response and response.StatusCode == 429 then
-            return false, "Rate limited, wait 20 seconds"
         end
-        return false, "Failed to get link"
+        return false, "Invalid response"
+    elseif response.StatusCode == 429 then
+        return false, "Rate limited, wait 20 seconds"
     else
-        return true, cachedLink
+        return false, "Server error: " .. tostring(response.StatusCode)
     end
 end
-
-pcall(cacheLink)
 
 local function generateNonce()
     local chars = "abcdefghijklmnopqrstuvwxyz"
     local str = ""
+    math.randomseed(os.time() + math.random(1, 99999))
     for _ = 1, 16 do
         local idx = math.random(1, #chars)
         str = str .. string.sub(chars, idx, idx)
@@ -344,20 +432,27 @@ end
 
 local function copyLink()
     local success, link = cacheLink()
-    if success then
-        safeClipboard(link)
-        return true
+    if success and link then
+        local clipSuccess = safeClipboard(link)
+        return clipSuccess or success, link
     end
-    return false
+    return false, link
 end
 
 local function verifyKey(key)
     if requestSending then
         return false, "Please wait..."
     end
+    
+    if not key or key == "" then
+        return false, "No key provided"
+    end
+    
     requestSending = true
 
-    local endpoint = host .. "/public/whitelist/" .. tostring(service) .. "?identifier=" .. lDigest(safeGetHwid()) .. "&key=" .. key
+    local hwid = safeGetHwid()
+    local identifier = lDigest(hwid)
+    local endpoint = host .. "/public/whitelist/" .. tostring(service) .. "?identifier=" .. identifier .. "&key=" .. key
 
     if useNonce then
         endpoint = endpoint .. "&nonce=" .. generateNonce()
@@ -370,31 +465,39 @@ local function verifyKey(key)
 
     requestSending = false
 
-    if response and response.StatusCode == 200 then
+    if not response then
+        return false, "Request failed"
+    end
+    
+    if response.StatusCode == 200 then
         local success, decoded = pcall(function()
             return HttpService:JSONDecode(response.Body)
         end)
-        if success and decoded.success == true then
-            if decoded.data.valid == true then
-                return true, "Key verified!"
-            else
-                return false, "Invalid or expired key"
+        
+        if success and decoded then
+            if decoded.success == true and decoded.data then
+                if decoded.data.valid == true then
+                    return true, "Key verified!"
+                else
+                    return false, "Invalid or expired key"
+                end
+            elseif decoded.message then
+                return false, decoded.message
             end
-        elseif success then
-            return false, decoded.message or "Unknown error"
         end
-    elseif response and response.StatusCode == 429 then
+        return false, "Invalid response"
+    elseif response.StatusCode == 429 then
         return false, "Rate limited, wait 20 seconds"
+    else
+        return false, "Server error: " .. tostring(response.StatusCode)
     end
-    
-    return false, "Server error, try again"
 end
 
 -- =========================================================================
 -- GUI CREATION
 -- =========================================================================
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "MRHubKeySystem_" .. math.random(1000, 9999)
+ScreenGui.Name = "MRHubKeySystem_" .. math.random(100000, 999999)
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.DisplayOrder = 999999
@@ -602,7 +705,7 @@ local Title = Instance.new("TextLabel")
 Title.Parent = Header
 Title.BackgroundTransparency = 1
 Title.Size = UDim2.new(1, 0, 1, 0)
-Title.Font = Enum.Font.GothamBold
+Title.Font = Enum.Font.LuckiestGuy
 Title.Text = "MINEROMA TEAM | KEY SYSTEM"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = titleSize
@@ -658,7 +761,7 @@ GetKeyBtn.BorderSizePixel = 0
 GetKeyBtn.Position = UDim2.new(0.5, 0, 0, 18)
 GetKeyBtn.Size = UDim2.new(0, buttonWidth, 0, buttonHeight)
 GetKeyBtn.AnchorPoint = Vector2.new(0.5, 0)
-GetKeyBtn.Font = Enum.Font.GothamBold
+GetKeyBtn.Font = Enum.Font.LuckiestGuy
 GetKeyBtn.Text = "GET KEY"
 GetKeyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 GetKeyBtn.TextSize = textSize
@@ -668,26 +771,20 @@ local GetKeyCorner = Instance.new("UICorner")
 GetKeyCorner.CornerRadius = UDim.new(0, 10)
 GetKeyCorner.Parent = GetKeyBtn
 
-local GetKeyStroke = Instance.new("UIStroke")
-GetKeyStroke.Color = Color3.fromRGB(200, 100, 255)
-GetKeyStroke.Thickness = 1
-GetKeyStroke.Transparency = 0.5
-GetKeyStroke.Parent = GetKeyBtn
-
 -- =========================================================================
 -- KEY INPUT
 -- =========================================================================
 local TextBox = Instance.new("TextBox")
 TextBox.Name = "KeyInput"
 TextBox.Parent = Main
-TextBox.BackgroundColor3 = Color3.fromRGB(55, 28, 85)
+TextBox.BackgroundColor3 = Color3.fromRGB(45, 22, 70)
 TextBox.BorderSizePixel = 0
 TextBox.Position = UDim2.new(0.5, 0, 0, 18 + buttonHeight + 12)
 TextBox.Size = UDim2.new(0, buttonWidth, 0, buttonHeight)
 TextBox.AnchorPoint = Vector2.new(0.5, 0)
 TextBox.Font = Enum.Font.Gotham
 TextBox.PlaceholderText = "Enter your key here..."
-TextBox.PlaceholderColor3 = Color3.fromRGB(130, 130, 130)
+TextBox.PlaceholderColor3 = Color3.fromRGB(120, 100, 140)
 TextBox.Text = ""
 TextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 TextBox.TextSize = isMobile and 13 or 15
@@ -700,7 +797,7 @@ TextBoxCorner.CornerRadius = UDim.new(0, 10)
 TextBoxCorner.Parent = TextBox
 
 local TextBoxStroke = Instance.new("UIStroke")
-TextBoxStroke.Color = Color3.fromRGB(161, 46, 255)
+TextBoxStroke.Color = Color3.fromRGB(100, 60, 140)
 TextBoxStroke.Thickness = 1.5
 TextBoxStroke.Parent = TextBox
 
@@ -739,7 +836,7 @@ CheckKeyBtn.BorderSizePixel = 0
 CheckKeyBtn.Position = UDim2.new(0.5, 0, 0, 18 + buttonHeight + 12 + buttonHeight + 12)
 CheckKeyBtn.Size = UDim2.new(0, buttonWidth, 0, buttonHeight)
 CheckKeyBtn.AnchorPoint = Vector2.new(0.5, 0)
-CheckKeyBtn.Font = Enum.Font.GothamBold
+CheckKeyBtn.Font = Enum.Font.LuckiestGuy
 CheckKeyBtn.Text = "CHECK KEY"
 CheckKeyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 CheckKeyBtn.TextSize = textSize
@@ -748,12 +845,6 @@ CheckKeyBtn.AutoButtonColor = true
 local CheckKeyCorner = Instance.new("UICorner")
 CheckKeyCorner.CornerRadius = UDim.new(0, 10)
 CheckKeyCorner.Parent = CheckKeyBtn
-
-local CheckKeyStroke = Instance.new("UIStroke")
-CheckKeyStroke.Color = Color3.fromRGB(200, 100, 255)
-CheckKeyStroke.Thickness = 1
-CheckKeyStroke.Transparency = 0.5
-CheckKeyStroke.Parent = CheckKeyBtn
 
 -- =========================================================================
 -- INFO TEXT
@@ -782,14 +873,14 @@ GetKeyBtn.MouseButton1Click:Connect(function()
     GetKeyBtn.Text = "LOADING..."
     
     task.spawn(function()
-        local success = copyLink()
+        local success, result = copyLink()
         
         if success then
             showNotification("Link Copied!", "Open browser and paste the link", Color3.fromRGB(0, 255, 100), 4)
             GetKeyBtn.Text = "COPIED!"
             task.wait(2)
         else
-            showNotification("Error", "Failed to get link. Try again.", Color3.fromRGB(255, 50, 50), 3)
+            showNotification("Error", result or "Failed to get link", Color3.fromRGB(255, 50, 50), 4)
         end
         
         GetKeyBtn.Text = originalText
@@ -831,7 +922,7 @@ CheckKeyBtn.MouseButton1Click:Connect(function()
             end)
             
             if not loadSuccess then
-                warn("Failed to load script: " .. tostring(loadError))
+                warn("[MR HUB] Failed to load script: " .. tostring(loadError))
             end
         else
             showNotification("Invalid Key", message, Color3.fromRGB(255, 50, 50), 4)
@@ -845,7 +936,7 @@ end)
 -- AUTO CHECK SAVED KEY
 -- =========================================================================
 task.spawn(function()
-    task.wait(0.8)
+    task.wait(1)
     
     local savedKey = loadKey()
     
@@ -877,7 +968,9 @@ task.spawn(function()
     end
 end)
 
--- Debug info
+-- Debug
 print("[MR HUB] Key System loaded!")
 print("[MR HUB] Executor: " .. Executor.name)
-print("[MR HUB] Mobile: " .. tostring(isMobile))
+print("[MR HUB] Request available: " .. tostring(Executor.request ~= nil))
+print("[MR HUB] Clipboard available: " .. tostring(Executor.clipboard ~= nil))
+print("[MR HUB] File system available: " .. tostring(Executor.writefile ~= nil))
