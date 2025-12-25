@@ -1,34 +1,78 @@
 local service = "16451";
 local secret = "3fd9b8c7-1f40-41e6-afb7-b5d98a48d6e7";
+
 -- =========================================================================
--- SYSTEM SETUP
+-- EMERGENCY SCRIPT FOR DELTA
 -- =========================================================================
 repeat task.wait() until game:IsLoaded()
 
-local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
 local CoreGui = game:GetService("CoreGui")
-local UserInputService = game:GetService("UserInputService")
 
--- 1. SEARCH FOR REQUEST FUNCTION
-local requestFunc = request or http_request or (http and http.request) or (syn and syn.request) or (fluxus and fluxus.request)
+-- 1. CLEAN GUI RESET
+pcall(function()
+    if CoreGui:FindFirstChild("MRHubDebug") then CoreGui.MRHubDebug:Destroy() end
+    if Players.LocalPlayer.PlayerGui:FindFirstChild("MRHubDebug") then Players.LocalPlayer.PlayerGui.MRHubDebug:Destroy() end
+end)
 
-if not requestFunc then
-    game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "Error", Text = "Executor not supported", Duration = 5
-    })
-    return
+-- 2. GUI SETUP (SIMPLE & STRONG)
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "MRHubDebug"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.IgnoreGuiInset = true
+
+-- Пытаемся в PlayerGui (для Delta лучше)
+pcall(function() ScreenGui.Parent = Players.LocalPlayer.PlayerGui end)
+if not ScreenGui.Parent then ScreenGui.Parent = CoreGui end
+
+local Main = Instance.new("Frame")
+Main.Parent = ScreenGui
+Main.Size = UDim2.new(0, 300, 0, 350)
+Main.Position = UDim2.new(0.5, 0, 0.5, 0)
+Main.AnchorPoint = Vector2.new(0.5, 0.5)
+Main.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Main.BorderSizePixel = 0
+
+local Stroke = Instance.new("UIStroke") Stroke.Parent = Main Stroke.Color = Color3.fromRGB(161, 46, 255) Stroke.Thickness = 2
+local Corner = Instance.new("UICorner") Corner.Parent = Main Corner.CornerRadius = UDim.new(0, 8)
+
+-- Console
+local Console = Instance.new("ScrollingFrame")
+Console.Parent = Main
+Console.Size = UDim2.new(0.9, 0, 0.4, 0)
+Console.Position = UDim2.new(0.5, 0, 0.95, 0)
+Console.AnchorPoint = Vector2.new(0.5, 1)
+Console.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+Console.ScrollBarThickness = 2
+
+local ConsoleList = Instance.new("UIListLayout") ConsoleList.Parent = Console
+
+local function log(text)
+    local L = Instance.new("TextLabel")
+    L.Parent = Console
+    L.Size = UDim2.new(1, 0, 0, 20)
+    L.BackgroundTransparency = 1
+    L.TextColor3 = Color3.new(1,1,1)
+    L.Text = " > " .. tostring(text)
+    L.TextXAlignment = Enum.TextXAlignment.Left
+    L.Font = Enum.Font.Code
+    L.TextSize = 12
+    Console.CanvasPosition = Vector2.new(0, 9999)
 end
 
--- 2. HWID & HASH
+log("Script loaded.")
+
+-- 3. NETWORK SETUP
+local requestFunc = http_request or request or (http and http.request) or (syn and syn.request)
+
+if not requestFunc then log("CRITICAL: No request function!") end
+
 local function getHwid()
-    local h = nil
-    pcall(function()
-        if gethwid then h = gethwid()
-        elseif getdeviceid then h = getdeviceid()
-        elseif getandroidid then h = getandroidid() end
-    end)
-    return h or tostring(Players.LocalPlayer.UserId)
+    if gethwid then return gethwid()
+    elseif getdeviceid then return getdeviceid()
+    elseif getandroidid then return getandroidid()
+    else return tostring(Players.LocalPlayer.UserId) end
 end
 
 local function hash(str)
@@ -37,191 +81,169 @@ local function hash(str)
     return h
 end
 
--- 3. DOMAIN LOGIC (FIX FOR DNS ERROR)
-local domains = {
-    "https://api.platoboost.net", -- Пробуем .net первым (он стабильнее)
-    "https://api.platoboost.com"
-}
-local currentHost = domains[1]
-
-local function makeRequest(endpoint, method, body)
-    local lastError = ""
-    
-    -- Пробуем каждый домен по очереди
-    for _, domain in ipairs(domains) do
-        local url = domain .. endpoint
-        
-        local success, result = pcall(function()
-            return requestFunc({
-                Url = url,
-                Method = method,
-                Headers = {["Content-Type"] = "application/json"},
-                Body = body
-            })
-        end)
-        
-        if success and result then
-            -- Если статус 200 или 429 (рейт лимит), значит домен живой
-            if result.StatusCode == 200 or result.StatusCode == 429 then
-                currentHost = domain -- Запоминаем рабочий домен
-                return result
-            end
-            lastError = "HTTP " .. tostring(result.StatusCode)
-        else
-            lastError = tostring(result) -- DNS Error будет здесь
-        end
-    end
-    
-    return nil, lastError
-end
-
--- =========================================================================
--- GUI
--- =========================================================================
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "MRHubKeySystem"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.IgnoreGuiInset = true
-
-pcall(function() ScreenGui.Parent = CoreGui end)
-if not ScreenGui.Parent then ScreenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui") end
-
-local Main = Instance.new("Frame")
-Main.Name = "Main"
-Main.Parent = ScreenGui
-Main.Size = UDim2.new(0, 350, 0, 300)
-Main.Position = UDim2.new(0.5, 0, 0.5, 0)
-Main.AnchorPoint = Vector2.new(0.5, 0.5)
-Main.BackgroundColor3 = Color3.fromRGB(35, 18, 55)
-Main.BorderSizePixel = 0
-local MC = Instance.new("UICorner") MC.Parent = Main MC.CornerRadius = UDim.new(0, 10)
-local MS = Instance.new("UIStroke") MS.Parent = Main MS.Color = Color3.fromRGB(161, 46, 255) MS.Thickness = 2
-
--- Header
-local Header = Instance.new("Frame") Header.Parent = Main Header.Size = UDim2.new(1,0,0,50) Header.BackgroundColor3 = Color3.fromRGB(85, 24, 134)
-local HC = Instance.new("UICorner") HC.Parent = Header HC.CornerRadius = UDim.new(0, 10)
-local HT = Instance.new("TextLabel") HT.Parent = Header HT.Size = UDim2.new(1,0,1,0) HT.BackgroundTransparency = 1 HT.Font = Enum.Font.LuckiestGuy HT.Text = "MINEROMA TEAM | KEY SYSTEM" HT.TextColor3 = Color3.new(1,1,1) HT.TextSize = 16
-
--- Dragging
-local dragging, dragStart, startPos
-Header.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then dragging=true dragStart=i.Position startPos=Main.Position end end)
-UserInputService.InputChanged:Connect(function(i) if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then local d=i.Position-dragStart Main.Position=UDim2.new(startPos.X.Scale,startPos.X.Offset+d.X,startPos.Y.Scale,startPos.Y.Offset+d.Y) end end)
-Header.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then dragging=false end end)
-
--- Notifications
-local NotifContainer = Instance.new("Frame") NotifContainer.Parent = ScreenGui NotifContainer.Size = UDim2.new(0,300,0,400) NotifContainer.Position = UDim2.new(1,-10,1,-10) NotifContainer.AnchorPoint = Vector2.new(1,1) NotifContainer.BackgroundTransparency = 1
-local NL = Instance.new("UIListLayout") NL.Parent = NotifContainer NL.VerticalAlignment = Enum.VerticalAlignment.Bottom NL.HorizontalAlignment = Enum.HorizontalAlignment.Right NL.Padding = UDim.new(0,5)
-
-local function notify(title, text, color)
-    local F = Instance.new("Frame") F.Parent = NotifContainer F.Size = UDim2.new(0,280,0,60) F.BackgroundColor3 = Color3.fromRGB(25,25,35) F.BackgroundTransparency = 0.1
-    local S = Instance.new("UIStroke") S.Parent = F S.Color = color S.Thickness = 1.5
-    local C = Instance.new("UICorner") C.Parent = F C.CornerRadius = UDim.new(0,8)
-    local T = Instance.new("TextLabel") T.Parent = F T.BackgroundTransparency=1 T.Position=UDim2.new(0,10,0,5) T.Size=UDim2.new(1,-20,0,20) T.Font=Enum.Font.LuckiestGuy T.Text=title T.TextColor3=Color3.new(1,1,1) T.TextSize=14 T.TextXAlignment=Enum.TextXAlignment.Left
-    local D = Instance.new("TextLabel") D.Parent = F D.BackgroundTransparency=1 D.Position=UDim2.new(0,10,0,25) D.Size=UDim2.new(1,-20,0,30) D.Font=Enum.Font.Gotham D.Text=text D.TextColor3=Color3.fromRGB(200,200,200) D.TextSize=12 T.TextXAlignment=Enum.TextXAlignment.Left D.TextWrapped=true
-    task.delay(4, function() F:Destroy() end)
-end
-
--- Controls
-local function btn(text, y)
-    local B = Instance.new("TextButton") B.Parent = Main B.Size = UDim2.new(0.8,0,0,45) B.Position = UDim2.new(0.5,0,0,y) B.AnchorPoint = Vector2.new(0.5,0) B.BackgroundColor3 = Color3.fromRGB(161, 46, 255) B.Font = Enum.Font.LuckiestGuy B.Text = text B.TextColor3 = Color3.new(1,1,1) B.TextSize = 18
-    local C = Instance.new("UICorner") C.Parent = B C.CornerRadius = UDim.new(0,8)
+-- 4. BUTTONS
+local function createBtn(text, y, callback)
+    local B = Instance.new("TextButton")
+    B.Parent = Main
+    B.Size = UDim2.new(0.8, 0, 0, 40)
+    B.Position = UDim2.new(0.5, 0, 0, y)
+    B.AnchorPoint = Vector2.new(0.5, 0)
+    B.BackgroundColor3 = Color3.fromRGB(161, 46, 255)
+    B.Font = Enum.Font.LuckiestGuy
+    B.Text = text
+    B.TextColor3 = Color3.new(1,1,1)
+    B.TextSize = 16
+    local C = Instance.new("UICorner") C.Parent = B C.CornerRadius = UDim.new(0, 6)
+    B.MouseButton1Click:Connect(callback)
     return B
 end
 
-local GetKeyBtn = btn("GET KEY", 70)
-local CheckKeyBtn = btn("CHECK KEY", 200)
+local Title = Instance.new("TextLabel")
+Title.Parent = Main
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundTransparency = 1
+Title.Font = Enum.Font.LuckiestGuy
+Title.Text = "DEBUG MODE"
+Title.TextColor3 = Color3.fromRGB(161, 46, 255)
+Title.TextSize = 20
 
-local Input = Instance.new("TextBox") Input.Parent = Main Input.Size = UDim2.new(0.8,0,0,45) Input.Position = UDim2.new(0.5,0,0,135) Input.AnchorPoint = Vector2.new(0.5,0) Input.BackgroundColor3 = Color3.fromRGB(45, 22, 70) Input.Font = Enum.Font.Gotham Input.Text = "" Input.PlaceholderText = "Paste Key..." Input.PlaceholderColor3 = Color3.fromRGB(150,150,150) Input.TextColor3 = Color3.new(1,1,1) Input.TextSize = 14 Input.ClipsDescendants = true
-local IC = Instance.new("UICorner") IC.Parent = Input IC.CornerRadius = UDim.new(0,8)
-local IS = Instance.new("UIStroke") IS.Parent = Input IS.Color = Color3.fromRGB(100, 60, 140) IS.Thickness = 1.5
+local Input = Instance.new("TextBox")
+Input.Parent = Main
+Input.Size = UDim2.new(0.8, 0, 0, 35)
+Input.Position = UDim2.new(0.5, 0, 0, 110)
+Input.AnchorPoint = Vector2.new(0.5, 0)
+Input.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+Input.Font = Enum.Font.Gotham
+Input.Text = ""
+Input.PlaceholderText = "Paste Key..."
+Input.TextColor3 = Color3.new(1,1,1)
+Input.TextSize = 14
+local IC = Instance.new("UICorner") IC.Parent = Input IC.CornerRadius = UDim.new(0, 6)
 
--- =========================================================================
--- LOGIC
--- =========================================================================
+-- 5. LOGIC
 
--- Get Link
-GetKeyBtn.MouseButton1Click:Connect(function()
-    GetKeyBtn.Text = "LOADING..."
-    task.spawn(function()
-        local body = HttpService:JSONEncode({
-            service = service,
-            identifier = hash(getHwid())
-        })
-        
-        local result, err = makeRequest("/public/start", "POST", body)
-        
-        if result then
-            if result.StatusCode == 200 then
-                local data = HttpService:JSONDecode(result.Body)
-                if data.success then
-                    if setclipboard then
-                        setclipboard(data.data.url)
-                        notify("Success", "Link copied!", Color3.fromRGB(0,255,100))
-                        GetKeyBtn.Text = "COPIED!"
-                    else
-                        Input.Text = data.data.url
-                        notify("Success", "Link in text box (No clipboard)", Color3.fromRGB(0,255,100))
-                        GetKeyBtn.Text = "DONE"
-                    end
-                else
-                    notify("API Error", data.message, Color3.fromRGB(255,50,50))
-                    GetKeyBtn.Text = "GET KEY"
-                end
-            elseif result.StatusCode == 429 then
-                notify("Rate Limit", "Wait 15s", Color3.fromRGB(255,150,0))
-                GetKeyBtn.Text = "GET KEY"
-            else
-                notify("HTTP Error", "Status: "..result.StatusCode, Color3.fromRGB(255,50,50))
-                GetKeyBtn.Text = "GET KEY"
-            end
-        else
-            notify("Connection Error", err, Color3.fromRGB(255,50,50))
-            GetKeyBtn.Text = "GET KEY"
-        end
-        task.wait(2)
-        if GetKeyBtn.Text ~= "GET KEY" then GetKeyBtn.Text = "GET KEY" end
+-- TEST INTERNET
+createBtn("1. TEST NETWORK", 50, function()
+    log("Testing Google connection...")
+    local s, r = pcall(function()
+        return game:HttpGet("https://google.com")
     end)
+    if s then
+        log("Google: SUCCESS")
+    else
+        log("Google: FAILED (No Internet?)")
+        log(r)
+    end
 end)
 
--- Verify
-CheckKeyBtn.MouseButton1Click:Connect(function()
-    CheckKeyBtn.Text = "CHECKING..."
-    task.spawn(function()
-        local key = Input.Text
-        if #key < 5 then notify("Error", "Invalid Key", Color3.fromRGB(255,50,50)) CheckKeyBtn.Text = "CHECK KEY" return end
+-- GET LINK
+createBtn("2. GET KEY LINK", 160, function()
+    log("Getting Link...")
+    
+    local myHwid = getHwid()
+    local identifier = hash(myHwid)
+    log("HWID: " .. string.sub(identifier, 1, 10).."...")
+    
+    -- Using .net mirror first, it's often better
+    local url = "https://api.platoboost.net/public/start"
+    
+    local body = HttpService:JSONEncode({
+        service = service,
+        identifier = identifier
+    })
+    
+    local s, r = pcall(function()
+        return requestFunc({
+            Url = url,
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json"
+            },
+            Body = body
+        })
+    end)
+    
+    if s and r then
+        log("Status: " .. tostring(r.StatusCode))
+        if r.StatusCode == 200 then
+            local data = HttpService:JSONDecode(r.Body)
+            if data.success then
+                if setclipboard then
+                    setclipboard(data.data.url)
+                    log("LINK COPIED TO CLIPBOARD!")
+                    Input.Text = "LINK COPIED!"
+                else
+                    Input.Text = data.data.url
+                    log("Link in textbox (Manual copy)")
+                end
+            else
+                log("API Error: " .. tostring(data.message))
+            end
+        else
+            log("HTTP Error: " .. tostring(r.StatusCode))
+            -- Try fallback to .com
+            log("Trying .com domain...")
+            -- (Можно добавить повтор запроса на .com тут если хочешь)
+        end
+    else
+        log("Req Failed: " .. tostring(r))
+    end
+end)
+
+-- CHECK KEY (USING HttpGet)
+createBtn("3. VERIFY KEY", 210, function()
+    local key = Input.Text
+    if #key < 5 then log("Enter key first") return end
+    log("Verifying...")
+    
+    local identifier = hash(getHwid())
+    -- Используем game:HttpGet для проверки, это часто обходит DNS баги request-а
+    local url = "https://api.platoboost.com/public/whitelist/" .. service .. "?identifier=" .. identifier .. "&key=" .. key
+    
+    local s, r = pcall(function()
+        return game:HttpGet(url)
+    end)
+    
+    if s then
+        log("Response received!")
+        local data = HttpService:JSONDecode(r)
+        if data.success and data.data.valid then
+            log("KEY VALID!")
+            pcall(function() writefile("MRHub_Key.txt", key) end)
+            task.wait(1)
+            ScreenGui:Destroy()
+            loadstring(game:HttpGet('https://raw.githubusercontent.com/MineRoma/MRHUBNEW_UNI/refs/heads/main/nnnft'))()
+        else
+            log("Invalid Key")
+        end
+    else
+        log("Verify Failed: " .. tostring(r))
         
-        local nonce = "" for i=1,16 do nonce=nonce..string.char(math.random(97,122)) end
-        local endpoint = "/public/whitelist/"..service.."?identifier="..hash(getHwid()).."&key="..key.."&nonce="..nonce
+        -- Fallback to .net with request
+        log("Trying fallback method...")
+        local url2 = "https://api.platoboost.net/public/whitelist/" .. service .. "?identifier=" .. identifier .. "&key=" .. key
+        local s2, r2 = pcall(function()
+            return requestFunc({
+                Url = url2,
+                Method = "GET"
+            })
+        end)
         
-        local result, err = makeRequest(endpoint, "GET")
-        
-        if result and result.StatusCode == 200 then
-            local data = HttpService:JSONDecode(result.Body)
-            if data.success and data.data.valid then
-                pcall(function() writefile("MRHub_Key.txt", key) end)
-                notify("Success", "Valid Key!", Color3.fromRGB(0,255,100))
-                CheckKeyBtn.Text = "SUCCESS"
-                task.wait(1)
+        if s2 and r2 and r2.StatusCode == 200 then
+             local data = HttpService:JSONDecode(r2.Body)
+             if data.success and data.data.valid then
+                log("VALID (Fallback)!")
                 ScreenGui:Destroy()
                 loadstring(game:HttpGet('https://raw.githubusercontent.com/MineRoma/MRHUBNEW_UNI/refs/heads/main/nnnft'))()
-            else
-                notify("Error", "Invalid Key", Color3.fromRGB(255,50,50))
-                CheckKeyBtn.Text = "CHECK KEY"
-            end
+             end
         else
-            notify("Error", err or "Invalid Response", Color3.fromRGB(255,50,50))
-            CheckKeyBtn.Text = "CHECK KEY"
-        end
-    end)
-end)
-
--- Auto Load
-task.spawn(function()
-    if isfile and isfile("MRHub_Key.txt") then
-        local saved = readfile("MRHub_Key.txt")
-        if saved and #saved > 5 then
-            Input.Text = saved
-            notify("Auto-Load", "Key restored", Color3.fromRGB(161,46,255))
+            log("Fallback failed too.")
         end
     end
 end)
+
+-- AUTO LOAD
+if isfile and isfile("MRHub_Key.txt") then
+    local k = readfile("MRHub_Key.txt")
+    if k then Input.Text = k log("Saved key loaded") end
+end
