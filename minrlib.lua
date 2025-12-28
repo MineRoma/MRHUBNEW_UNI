@@ -2290,14 +2290,12 @@ function Tab:CreateColorPicker(config)
         end
     end)
     
-    -- Открытие/закрытие
     ColorBtn.MouseButton1Click:Connect(function()
         Opened = not Opened
         local targetHeight = Opened and (baseHeight + 140) or baseHeight
         Tween(ColorPicker, {Size = UDim2.new(1, 0, 0, targetHeight)}, 0.25)
     end)
     
-    -- API
     local ColorAPI = {}
     
     function ColorAPI:Set(color)
