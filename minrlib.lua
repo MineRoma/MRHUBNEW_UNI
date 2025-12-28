@@ -2234,62 +2234,6 @@ function Tab:CreateColorPicker(config)
         end
     end)
     
-    -- Открытие/закрытие
-    ColorBtn.MouseButton1Click:Connect(function()
-        Opened = not Opened
-        local targetHeight = Opened and (baseHeight + 140) or baseHeight
-        Tween(ColorPicker, {Size = UDim2.new(1, 0, 0, targetHeight)}, 0.25)
-    end)
-    
-    -- API
-    local ColorAPI = {}
-    
-    function ColorAPI:Set(color)
-        CurrentColor = color
-        CurrentHue, CurrentSat, CurrentVal = color:ToHSV()
-        
-        MainCursor.Position = UDim2.new(CurrentSat, -6, 1 - CurrentVal, -6)
-        HueCursor.Position = UDim2.new(0.5, -8, CurrentHue, -3)
-        
-        ColorPreview.BackgroundColor3 = color
-        MainPicker.BackgroundColor3 = Color3.fromHSV(CurrentHue, 1, 1)
-        colorConfig.Callback(color)
-    end
-    
-    local draggingHue = false
-    
-    local function UpdateHue(input)
-        local pos = input.Position
-        local relY = math.clamp((pos.Y - HueSlider.AbsolutePosition.Y) / HueSlider.AbsoluteSize.Y, 0, 1)
-        
-        CurrentHue = relY
-        HueCursor.Position = UDim2.new(0.5, -8, relY, -3)
-        UpdateColor()
-    end
-    
-    HueBtn.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            draggingHue = true
-            UpdateHue(input)
-        end
-    end)
-    
-    HueBtn.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            draggingHue = false
-        end
-    end)
-    
-    UserInputService.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            if draggingMain then
-                UpdateMain(input)
-            elseif draggingHue then
-                UpdateHue(input)
-            end
-        end
-    end)
-    
     ColorBtn.MouseButton1Click:Connect(function()
         Opened = not Opened
         local targetHeight = Opened and (baseHeight + 140) or baseHeight
