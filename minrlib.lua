@@ -259,13 +259,18 @@ function MinrLib:CreateWindow(config)
         ResetOnSpawn = false
     })
     
+    -- Сохраняем начальные позиции
+    local shapkStartY = 0.5
+    local shapkOffsetY = -190
+    local mainOffsetY = 27
+    
     -- TopBar (shapk)
     local shapk = Create("Frame", {
         Name = "shapk",
         Parent = MinrGUI,
         BackgroundColor3 = Theme.TopBar,
         AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.new(0.5, 0, 0.5, -190),
+        Position = UDim2.new(0.5, 0, shapkStartY, shapkOffsetY),
         Size = IsMobile and UDim2.new(0.95, 0, 0, 53) or UDim2.new(0, 547, 0, 53),
         ClipsDescendants = true
     })
@@ -323,20 +328,20 @@ function MinrLib:CreateWindow(config)
     })
     Corner(MinBtn, 6)
     
-    -- Main Frame
+    -- Main Frame (AnchorPoint сверху для анимации вверх)
     local main = Create("Frame", {
         Name = "main",
         Parent = MinrGUI,
         BackgroundColor3 = Theme.Main,
         BackgroundTransparency = Theme.MainTransparency,
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.new(0.5, 0, 0.5, 27),
+        AnchorPoint = Vector2.new(0.5, 0),
+        Position = UDim2.new(0.5, 0, shapkStartY, shapkOffsetY + 53),
         Size = IsMobile and UDim2.new(0.95, 0, 0, 381) or UDim2.new(0, 547, 0, 381),
         ClipsDescendants = true
     })
     Corner(main, 8)
     
-    Create("UISizeConstraint", {Parent = main, MinSize = Vector2.new(350, 300), MaxSize = Vector2.new(700, 500)})
+    Create("UISizeConstraint", {Parent = main, MinSize = Vector2.new(350, 0), MaxSize = Vector2.new(700, 500)})
     
     -- Tab Bar (shapk2)
     local shapk2 = Create("Frame", {
@@ -422,171 +427,12 @@ function MinrLib:CreateWindow(config)
         Tabs = {},
         CurrentTab = nil,
         Minimized = false,
-        Visible = true
+        Visible = true,
+        ToggleKey = WindowConfig.ToggleKey
     }
     
-    -- Анимация появления
-    shapk.Position = UDim2.new(0.5, 0, 0.5, -250)
-    main.Size = IsMobile and UDim2.new(0.95, 0, 0, 0) or UDim2.new(0, 547, 0, 0)
-    shapk.BackgroundTransparency = 1
-    main.BackgroundTransparency = 1
-    
-    task.spawn(function()
-        task.wait(0.1)
-        Tween(shapk, {Position = UDim2.new(0.5, 0, 0.5, -190), BackgroundTransparency = 0}, 0.5, Enum.EasingStyle.Back)
-        task.wait(0.2)
-        Tween(main, {Size = IsMobile and UDim2.new(0.95, 0, 0, 381) or UDim2.new(0, 547, 0, 381), BackgroundTransparency = Theme.MainTransparency}, 0.4, Enum.EasingStyle.Back)
-        
-        task.wait(0.5)
-        if not IsMobile then
-            Window:Notify({
-                Title = "GUI Loaded",
-                Description = "Press " .. WindowConfig.ToggleKey.Name .. " to toggle",
-                Duration = 4,
-                Type = "Info"
-            })
-        end
-    end)
-    
-    -- Drag
-    local dragging, dragInput, dragStart, startPosTop, startPosMain
-    
-    shapk.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPosTop = shapk.Position
-            startPosMain = main.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                end
-            end)
-        end
-    end)
-    
-    shapk.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
-        end
-    end)
-    
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - dragStart
-            shapk.Position = UDim2.new(startPosTop.X.Scale, startPosTop.X.Offset + delta.X, startPosTop.Y.Scale, startPosTop.Y.Offset + delta.Y)
-            main.Position = UDim2.new(startPosMain.X.Scale, startPosMain.X.Offset + delta.X, startPosMain.Y.Scale, startPosMain.Y.Offset + delta.Y)
-        end
-    end)
-    
     --[[
-        КНОПКА X - СКРЫТИЕ GUI
-        Скрывает всё окно, можно открыть через ToggleKey или мобильную кнопку
-    ]]
-    X.MouseButton1Click:Connect(function()
-        Window.Visible = false
-        shapk.Visible = false
-        main.Visible = false
-        
-        if MobileBtn then
-            MobileBtn.Visible = true
-        end
-    end)
-    
-    X.MouseEnter:Connect(function() Tween(X, {BackgroundColor3 = Color3.fromRGB(255, 100, 100)}, 0.15) end)
-    X.MouseLeave:Connect(function() Tween(X, {BackgroundColor3 = Color3.fromRGB(220, 80, 80)}, 0.15) end)
-    
-    --[[
-        КНОПКА MINIMIZE - СВОРАЧИВАНИЕ
-        При нажатии: main скрывается, кнопка меняется на +
-        При повторном нажатии: main появляется, кнопка меняется на -
-    ]]
-    MinBtn.MouseButton1Click:Connect(function()
-        Window.Minimized = not Window.Minimized
-        
-        if Window.Minimized then
-            Tween(main, {Size = UDim2.new(0, 547, 0, 0)}, 0.3)
-            task.wait(0.3)
-            main.Visible = false
-            MinBtn.Text = "+"
-        else
-            main.Visible = true
-            Tween(main, {Size = IsMobile and UDim2.new(0.95, 0, 0, 381) or UDim2.new(0, 547, 0, 381)}, 0.3)
-            MinBtn.Text = "−"
-        end
-    end)
-    
-    MinBtn.MouseEnter:Connect(function() Tween(MinBtn, {BackgroundColor3 = Color3.fromRGB(255, 200, 100)}, 0.15) end)
-    MinBtn.MouseLeave:Connect(function() Tween(MinBtn, {BackgroundColor3 = Color3.fromRGB(220, 180, 80)}, 0.15) end)
-    
-    --[[
-        TOGGLE KEY - скрывает/показывает всё окно
-    ]]
-    if not IsMobile then
-        UserInputService.InputBegan:Connect(function(input, processed)
-            if not processed and input.KeyCode == WindowConfig.ToggleKey then
-                Window.Visible = not Window.Visible
-                shapk.Visible = Window.Visible
-                
-                if Window.Visible then
-                    if not Window.Minimized then
-                        main.Visible = true
-                    end
-                else
-                    main.Visible = false
-                end
-                
-                if MobileBtn then
-                    MobileBtn.Visible = not Window.Visible
-                end
-            end
-        end)
-    end
-    
-    --[[
-        МОБИЛЬНАЯ КНОПКА
-    ]]
-    if MobileBtn then
-        local mDragging = false
-        local mDragStart, mStartPos
-        
-        MobileBtn.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.Touch then
-                mDragging = true
-                mDragStart = input.Position
-                mStartPos = MobileBtn.Position
-            end
-        end)
-        
-        MobileBtn.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.Touch then
-                mDragging = false
-            end
-        end)
-        
-        UserInputService.InputChanged:Connect(function(input)
-            if mDragging and input.UserInputType == Enum.UserInputType.Touch then
-                local delta = input.Position - mDragStart
-                MobileBtn.Position = UDim2.new(mStartPos.X.Scale, mStartPos.X.Offset + delta.X, mStartPos.Y.Scale, mStartPos.Y.Offset + delta.Y)
-            end
-        end)
-        
-        MobileBtn.MouseButton1Click:Connect(function()
-            Window.Visible = true
-            shapk.Visible = true
-            main.Visible = true
-            MobileBtn.Visible = false
-            
-            if Window.Minimized then
-                Window.Minimized = false
-                main.Size = IsMobile and UDim2.new(0.95, 0, 0, 381) or UDim2.new(0, 547, 0, 381)
-                MinBtn.Text = "−"
-            end
-        end)
-    end
-    
-    --[[
-        УВЕДОМЛЕНИЯ
+        УВЕДОМЛЕНИЯ (объявляем раньше чтобы использовать в кнопках)
     ]]
     function Window:Notify(config)
         config = config or {}
@@ -683,6 +529,204 @@ function MinrLib:CreateWindow(config)
             Tween(Alert0, {Position = UDim2.new(1, 50, 0, 0)}, 0.3)
             task.wait(0.3)
             Alert0:Destroy()
+        end)
+    end
+    
+    -- Анимация появления
+    shapk.Position = UDim2.new(0.5, 0, 0.5, -300)
+    main.Size = IsMobile and UDim2.new(0.95, 0, 0, 0) or UDim2.new(0, 547, 0, 0)
+    shapk.BackgroundTransparency = 1
+    main.BackgroundTransparency = 1
+    
+    task.spawn(function()
+        task.wait(0.1)
+        Tween(shapk, {Position = UDim2.new(0.5, 0, shapkStartY, shapkOffsetY), BackgroundTransparency = 0}, 0.5, Enum.EasingStyle.Back)
+        task.wait(0.2)
+        Tween(main, {Size = IsMobile and UDim2.new(0.95, 0, 0, 381) or UDim2.new(0, 547, 0, 381), BackgroundTransparency = Theme.MainTransparency}, 0.4, Enum.EasingStyle.Back)
+        
+        task.wait(0.5)
+        if not IsMobile then
+            Window:Notify({
+                Title = "GUI Loaded",
+                Description = "Press " .. WindowConfig.ToggleKey.Name .. " to toggle",
+                Duration = 4,
+                Type = "Info"
+            })
+        end
+    end)
+    
+    -- Drag
+    local dragging, dragInput, dragStart, startPosTop, startPosMain
+    
+    shapk.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPosTop = shapk.Position
+            startPosMain = main.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    
+    shapk.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            local newShapkPos = UDim2.new(startPosTop.X.Scale, startPosTop.X.Offset + delta.X, startPosTop.Y.Scale, startPosTop.Y.Offset + delta.Y)
+            shapk.Position = newShapkPos
+            -- main следует за shapk (позиция под shapk)
+            main.Position = UDim2.new(newShapkPos.X.Scale, newShapkPos.X.Offset, newShapkPos.Y.Scale, newShapkPos.Y.Offset + 53)
+        end
+    end)
+    
+    --[[
+        КНОПКА X - СКРЫТИЕ GUI
+        Скрывает всё окно + показывает уведомление как открыть
+    ]]
+    X.MouseButton1Click:Connect(function()
+        Window.Visible = false
+        
+        -- Анимация скрытия
+        Tween(shapk, {BackgroundTransparency = 1}, 0.3)
+        Tween(main, {Size = UDim2.new(main.Size.X.Scale, main.Size.X.Offset, 0, 0)}, 0.3)
+        
+        task.wait(0.3)
+        shapk.Visible = false
+        main.Visible = false
+        
+        if MobileBtn then
+            MobileBtn.Visible = true
+        end
+        
+        -- Уведомление как открыть
+        if not IsMobile then
+            Window:Notify({
+                Title = "GUI Hidden",
+                Description = "Press " .. WindowConfig.ToggleKey.Name .. " to open GUI",
+                Duration = 5,
+                Type = "Info"
+            })
+        else
+            Window:Notify({
+                Title = "GUI Hidden",
+                Description = "Tap the ☰ button to open GUI",
+                Duration = 5,
+                Type = "Info"
+            })
+        end
+    end)
+    
+    X.MouseEnter:Connect(function() Tween(X, {BackgroundColor3 = Color3.fromRGB(255, 100, 100)}, 0.15) end)
+    X.MouseLeave:Connect(function() Tween(X, {BackgroundColor3 = Color3.fromRGB(220, 80, 80)}, 0.15) end)
+    
+    --[[
+        КНОПКА MINIMIZE - СВОРАЧИВАНИЕ ВВЕРХ
+        При нажатии: main сворачивается вверх (Size.Y = 0)
+        Кнопка меняется на +
+    ]]
+    MinBtn.MouseButton1Click:Connect(function()
+        Window.Minimized = not Window.Minimized
+        
+        if Window.Minimized then
+            -- Сворачиваем вверх
+            Tween(main, {Size = UDim2.new(main.Size.X.Scale, main.Size.X.Offset, 0, 0)}, 0.3, Enum.EasingStyle.Quart)
+            MinBtn.Text = "+"
+        else
+            -- Разворачиваем вниз
+            Tween(main, {Size = IsMobile and UDim2.new(0.95, 0, 0, 381) or UDim2.new(0, 547, 0, 381)}, 0.3, Enum.EasingStyle.Quart)
+            MinBtn.Text = "−"
+        end
+    end)
+    
+    MinBtn.MouseEnter:Connect(function() Tween(MinBtn, {BackgroundColor3 = Color3.fromRGB(255, 200, 100)}, 0.15) end)
+    MinBtn.MouseLeave:Connect(function() Tween(MinBtn, {BackgroundColor3 = Color3.fromRGB(220, 180, 80)}, 0.15) end)
+    
+    --[[
+        TOGGLE KEY - скрывает/показывает всё окно
+    ]]
+    if not IsMobile then
+        UserInputService.InputBegan:Connect(function(input, processed)
+            if not processed and input.KeyCode == WindowConfig.ToggleKey then
+                Window.Visible = not Window.Visible
+                
+                if Window.Visible then
+                    -- Показываем
+                    shapk.Visible = true
+                    shapk.BackgroundTransparency = 0
+                    
+                    if not Window.Minimized then
+                        main.Visible = true
+                        main.Size = IsMobile and UDim2.new(0.95, 0, 0, 381) or UDim2.new(0, 547, 0, 381)
+                    end
+                    
+                    if MobileBtn then
+                        MobileBtn.Visible = false
+                    end
+                else
+                    -- Скрываем
+                    shapk.Visible = false
+                    main.Visible = false
+                    
+                    if MobileBtn then
+                        MobileBtn.Visible = true
+                    end
+                end
+            end
+        end)
+    end
+    
+    --[[
+        МОБИЛЬНАЯ КНОПКА
+    ]]
+    if MobileBtn then
+        local mDragging = false
+        local mDragStart, mStartPos
+        
+        MobileBtn.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch then
+                mDragging = true
+                mDragStart = input.Position
+                mStartPos = MobileBtn.Position
+            end
+        end)
+        
+        MobileBtn.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch then
+                mDragging = false
+            end
+        end)
+        
+        UserInputService.InputChanged:Connect(function(input)
+            if mDragging and input.UserInputType == Enum.UserInputType.Touch then
+                local delta = input.Position - mDragStart
+                MobileBtn.Position = UDim2.new(mStartPos.X.Scale, mStartPos.X.Offset + delta.X, mStartPos.Y.Scale, mStartPos.Y.Offset + delta.Y)
+            end
+        end)
+        
+        MobileBtn.MouseButton1Click:Connect(function()
+            Window.Visible = true
+            shapk.Visible = true
+            shapk.BackgroundTransparency = 0
+            main.Visible = true
+            MobileBtn.Visible = false
+            
+            -- Если было свёрнуто - разворачиваем
+            if Window.Minimized then
+                Window.Minimized = false
+                main.Size = IsMobile and UDim2.new(0.95, 0, 0, 381) or UDim2.new(0, 547, 0, 381)
+                MinBtn.Text = "−"
+            else
+                main.Size = IsMobile and UDim2.new(0.95, 0, 0, 381) or UDim2.new(0, 547, 0, 381)
+            end
         end)
     end
     
