@@ -9,15 +9,13 @@ local MinrLib = {}
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
-local GuiParent = (function()
-    local success, result = pcall(function()
-        local test = Instance.new("ScreenGui")
-        test.Parent = game:GetService("CoreGui")
-        test:Destroy()
-        return game:GetService("CoreGui")
-    end)
-    return success and result or game.Players.LocalPlayer:WaitForChild("PlayerGui")
-end)()
+local GuiParent
+pcall(function()
+    GuiParent = game:GetService("CoreGui")
+end)
+if not GuiParent then
+    GuiParent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+end
 
 local Player = Players.LocalPlayer
 local IsMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
@@ -551,7 +549,6 @@ function MinrLib:CreateWindow(config)
     return Window
 end
 
-return MinrLib
 --[[
     MinrLib - Часть 2
     Табы + Button, Toggle, Slider
@@ -1965,3 +1962,5 @@ function Tab:CreateColorPicker(config)
     
     return ColorAPI
 end
+
+return MinrLib
