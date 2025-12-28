@@ -9,7 +9,15 @@ local MinrLib = {}
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
-local CoreGui = game:GetService("CoreGui")
+local GuiParent = (function()
+    local success, result = pcall(function()
+        local test = Instance.new("ScreenGui")
+        test.Parent = game:GetService("CoreGui")
+        test:Destroy()
+        return game:GetService("CoreGui")
+    end)
+    return success and result or game.Players.LocalPlayer:WaitForChild("PlayerGui")
+end)()
 
 local Player = Players.LocalPlayer
 local IsMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
