@@ -25,7 +25,7 @@ if not GuiParent then
     GuiParent = Player:WaitForChild("PlayerGui")
 end
 
--- Темы (твой стиль + дополнительные)
+-- Темы
 MinrLib.Themes = {
     Default = {
         Main = Color3.fromRGB(136, 136, 136),
@@ -259,7 +259,7 @@ function MinrLib:CreateWindow(config)
         ResetOnSpawn = false
     })
     
-    -- TopBar (shapk) - Заголовок окна
+    -- TopBar (shapk)
     local shapk = Create("Frame", {
         Name = "shapk",
         Parent = MinrGUI,
@@ -271,7 +271,6 @@ function MinrLib:CreateWindow(config)
     })
     Corner(shapk, 8)
     
-    -- Constraint
     Create("UISizeConstraint", {Parent = shapk, MinSize = Vector2.new(350, 53), MaxSize = Vector2.new(700, 53)})
     
     -- Название GUI
@@ -282,7 +281,7 @@ function MinrLib:CreateWindow(config)
         Size = UDim2.new(0, 200, 1, 0)
     })
     
-    local TitleLabel = Create("TextLabel", {
+    Create("TextLabel", {
         Parent = textshapk,
         BackgroundTransparency = 1,
         Size = UDim2.new(1, 0, 1, 0),
@@ -292,7 +291,7 @@ function MinrLib:CreateWindow(config)
         TextSize = 20
     })
     
-    -- Кнопка закрытия (X)
+    -- Кнопка X (скрытие)
     local X = Create("TextButton", {
         Name = "X",
         Parent = shapk,
@@ -308,8 +307,8 @@ function MinrLib:CreateWindow(config)
     })
     Corner(X, 6)
     
-    -- Кнопка сворачивания (-)
-    local Minimize = Create("TextButton", {
+    -- Кнопка - (сворачивание)
+    local MinBtn = Create("TextButton", {
         Name = "Minimize",
         Parent = shapk,
         BackgroundColor3 = Color3.fromRGB(220, 180, 80),
@@ -322,7 +321,7 @@ function MinrLib:CreateWindow(config)
         TextSize = 20,
         AutoButtonColor = false
     })
-    Corner(Minimize, 6)
+    Corner(MinBtn, 6)
     
     -- Main Frame
     local main = Create("Frame", {
@@ -377,7 +376,7 @@ function MinrLib:CreateWindow(config)
         Size = UDim2.new(1, 0, 1, -64)
     })
     
-    -- Notification Container (правый нижний угол)
+    -- Notification Container
     local NotifContainer = Create("Frame", {
         Name = "Notifications",
         Parent = MinrGUI,
@@ -405,7 +404,8 @@ function MinrLib:CreateWindow(config)
             Font = Enum.Font.GothamBold,
             Text = "☰",
             TextColor3 = Theme.Text,
-            TextSize = 22
+            TextSize = 22,
+            Visible = false
         })
         Corner(MobileBtn, 25)
     end
@@ -479,42 +479,73 @@ function MinrLib:CreateWindow(config)
         end
     end)
     
-    -- Close
+    --[[
+        КНОПКА X - СКРЫТИЕ GUI
+        Скрывает всё окно, можно открыть через ToggleKey или мобильную кнопку
+    ]]
     X.MouseButton1Click:Connect(function()
         Window.Visible = false
-        Tween(main, {Size = IsMobile and UDim2.new(0.95, 0, 0, 0) or UDim2.new(0, 547, 0, 0)}, 0.3)
-        Tween(shapk, {BackgroundTransparency = 1}, 0.3)
-        task.wait(0.3)
-        MinrGUI:Destroy()
+        shapk.Visible = false
+        main.Visible = false
+        
+        if MobileBtn then
+            MobileBtn.Visible = true
+        end
     end)
     
     X.MouseEnter:Connect(function() Tween(X, {BackgroundColor3 = Color3.fromRGB(255, 100, 100)}, 0.15) end)
     X.MouseLeave:Connect(function() Tween(X, {BackgroundColor3 = Color3.fromRGB(220, 80, 80)}, 0.15) end)
     
-    -- Minimize
-    Minimize.MouseButton1Click:Connect(function()
+    --[[
+        КНОПКА MINIMIZE - СВОРАЧИВАНИЕ
+        При нажатии: main скрывается, кнопка меняется на +
+        При повторном нажатии: main появляется, кнопка меняется на -
+    ]]
+    MinBtn.MouseButton1Click:Connect(function()
         Window.Minimized = not Window.Minimized
+        
         if Window.Minimized then
-            Tween(main, {Size = IsMobile and UDim2.new(0.95, 0, 0, 0) or UDim2.new(0, 547, 0, 0)}, 0.3)
+            Tween(main, {Size = UDim2.new(0, 547, 0, 0)}, 0.3)
+            task.wait(0.3)
+            main.Visible = false
+            MinBtn.Text = "+"
         else
+            main.Visible = true
             Tween(main, {Size = IsMobile and UDim2.new(0.95, 0, 0, 381) or UDim2.new(0, 547, 0, 381)}, 0.3)
+            MinBtn.Text = "−"
         end
     end)
     
-    Minimize.MouseEnter:Connect(function() Tween(Minimize, {BackgroundColor3 = Color3.fromRGB(255, 200, 100)}, 0.15) end)
-    Minimize.MouseLeave:Connect(function() Tween(Minimize, {BackgroundColor3 = Color3.fromRGB(220, 180, 80)}, 0.15) end)
+    MinBtn.MouseEnter:Connect(function() Tween(MinBtn, {BackgroundColor3 = Color3.fromRGB(255, 200, 100)}, 0.15) end)
+    MinBtn.MouseLeave:Connect(function() Tween(MinBtn, {BackgroundColor3 = Color3.fromRGB(220, 180, 80)}, 0.15) end)
     
-    -- Toggle Key
+    --[[
+        TOGGLE KEY - скрывает/показывает всё окно
+    ]]
     if not IsMobile then
         UserInputService.InputBegan:Connect(function(input, processed)
             if not processed and input.KeyCode == WindowConfig.ToggleKey then
                 Window.Visible = not Window.Visible
-                MinrGUI.Enabled = Window.Visible
+                shapk.Visible = Window.Visible
+                
+                if Window.Visible then
+                    if not Window.Minimized then
+                        main.Visible = true
+                    end
+                else
+                    main.Visible = false
+                end
+                
+                if MobileBtn then
+                    MobileBtn.Visible = not Window.Visible
+                end
             end
         end)
     end
     
-    -- Mobile Toggle
+    --[[
+        МОБИЛЬНАЯ КНОПКА
+    ]]
     if MobileBtn then
         local mDragging = false
         local mDragStart, mStartPos
@@ -541,13 +572,21 @@ function MinrLib:CreateWindow(config)
         end)
         
         MobileBtn.MouseButton1Click:Connect(function()
-            Window.Visible = not Window.Visible
-            MinrGUI.Enabled = Window.Visible
+            Window.Visible = true
+            shapk.Visible = true
+            main.Visible = true
+            MobileBtn.Visible = false
+            
+            if Window.Minimized then
+                Window.Minimized = false
+                main.Size = IsMobile and UDim2.new(0.95, 0, 0, 381) or UDim2.new(0, 547, 0, 381)
+                MinBtn.Text = "−"
+            end
         end)
     end
     
     --[[
-        УВЕДОМЛЕНИЯ (твой стиль)
+        УВЕДОМЛЕНИЯ
     ]]
     function Window:Notify(config)
         config = config or {}
@@ -633,7 +672,6 @@ function MinrLib:CreateWindow(config)
             Size = UDim2.new(1, 0, 0, 4)
         })
         
-        -- Анимация
         Tween(Alert0, {Position = UDim2.new(0, 0, 0, 0)}, 0.4, Enum.EasingStyle.Back)
         Tween(Progress, {Size = UDim2.new(0, 0, 0, 4)}, notifConfig.Duration)
         
@@ -918,7 +956,35 @@ function MinrLib:CreateWindow(config)
                 Tween(Arrow, {Rotation = Opened and 180 or 0}, 0.25)
             end)
             
-            return {Set = function(_, v) Selected = dropConfig.MultiSelect and (type(v) == "table" and v or {v}) or v UpdateSelected() dropConfig.Callback(Selected) end, Get = function() return Selected end}
+            local DropdownAPI = {}
+            function DropdownAPI:Set(v)
+                if dropConfig.MultiSelect then
+                    Selected = type(v) == "table" and v or {v}
+                else
+                    Selected = v
+                end
+                UpdateSelected()
+                dropConfig.Callback(Selected)
+            end
+            function DropdownAPI:Get()
+                return Selected
+            end
+            function DropdownAPI:Refresh(newOptions)
+                for _, child in pairs(OptionsFrame:GetChildren()) do
+                    if child:IsA("TextButton") then
+                        child:Destroy()
+                    end
+                end
+                dropConfig.Options = newOptions
+                for _, opt in ipairs(newOptions) do
+                    CreateOption(opt)
+                end
+                if not dropConfig.MultiSelect then
+                    Selected = newOptions[1] or ""
+                    UpdateSelected()
+                end
+            end
+            return DropdownAPI
         end
         
         -- Input
