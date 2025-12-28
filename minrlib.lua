@@ -456,7 +456,7 @@ function MinrLib:CreateWindow(config)
             Title = config.Title or "Notification",
             Text = config.Text or "",
             Duration = config.Duration or 5,
-            Type = config.Type or "Info" -- Info, Success, Warning, Error
+            Type = config.Type or "Info"
         }
         
         local colors = {
@@ -477,13 +477,12 @@ function MinrLib:CreateWindow(config)
             Parent = NotifContainer,
             BackgroundColor3 = Theme.Background,
             Size = UDim2.new(1, 0, 0, 70),
-            Position = UDim2.new(1, 50, 0, 0), -- Начинаем за экраном
+            Position = UDim2.new(1, 50, 0, 0),
             ClipsDescendants = true
         })
         Corner(Notif, 8)
         Stroke(Notif, colors[notifConfig.Type], 2)
         
-        -- Иконка
         local Icon = Create("TextLabel", {
             Parent = Notif,
             BackgroundColor3 = colors[notifConfig.Type],
@@ -496,7 +495,6 @@ function MinrLib:CreateWindow(config)
         })
         Corner(Icon, 6)
         
-        -- Заголовок
         Create("TextLabel", {
             Parent = Notif,
             BackgroundTransparency = 1,
@@ -509,7 +507,6 @@ function MinrLib:CreateWindow(config)
             TextXAlignment = Enum.TextXAlignment.Left
         })
         
-        -- Текст
         Create("TextLabel", {
             Parent = Notif,
             BackgroundTransparency = 1,
@@ -523,7 +520,6 @@ function MinrLib:CreateWindow(config)
             TextWrapped = true
         })
         
-        -- Прогресс бар
         local Progress = Create("Frame", {
             Parent = Notif,
             BackgroundColor3 = colors[notifConfig.Type],
@@ -531,47 +527,351 @@ function MinrLib:CreateWindow(config)
             Size = UDim2.new(1, 0, 0, 3)
         })
         
-        -- Анимация появления
         Tween(Notif, {Position = UDim2.new(0, 0, 0, 0)}, 0.3)
-        
-        -- Анимация прогресса
         Tween(Progress, {Size = UDim2.new(0, 0, 0, 3)}, notifConfig.Duration)
         
-        -- Удаление
         task.delay(notifConfig.Duration, function()
             Tween(Notif, {Position = UDim2.new(1, 50, 0, 0)}, 0.3)
             task.wait(0.3)
             Notif:Destroy()
         end)
     end
-    
-    self.Window = Window
-    return Window
-end
-
---[[
-    MinrLib - Часть 2
-    Табы + Button, Toggle, Slider
-]]
-
---[[
-    СОЗДАНИЕ ТАБА
-]]
-function MinrLib.Window:CreateTab(config)
-    config = config or {}
-    
-    local tabConfig = {
-        Name = config.Name or "Tab",
-        Icon = config.Icon or nil -- rbxassetid://...
-    }
-    
-    local Window = self
-    local Theme = Window.Theme
-    
-    local Tab = {
-        Name = tabConfig.Name,
-        Elements = {}
-    }
+    --[[
+        СОЗДАНИЕ ТАБА
+    ]]
+    function Window:CreateTab(config)
+        config = config or {}
+        
+        local tabConfig = {
+            Name = config.Name or "Tab",
+            Icon = config.Icon or nil
+        }
+        
+        local Tab = {
+            Name = tabConfig.Name,
+            Elements = {}
+        }
+        
+        local TabBtn = Create("TextButton", {
+            Name = tabConfig.Name,
+            Parent = Window.TabScroll,
+            BackgroundColor3 = Theme.Tab,
+            Size = UDim2.new(0, tabConfig.Icon and 110 or 90, 1, 0),
+            Font = Enum.Font.GothamBold,
+            Text = "",
+            AutoButtonColor = false
+        })
+        Corner(TabBtn, 6)
+        
+        if tabConfig.Icon then
+            Create("ImageLabel", {
+                Parent = TabBtn,
+                BackgroundTransparency = 1,
+                Position = UDim2.new(0, 10, 0.5, -8),
+                Size = UDim2.new(0, 16, 0, 16),
+                Image = tabConfig.Icon,
+                ImageColor3 = Theme.Text
+            })
+        end
+        
+        Create("TextLabel", {
+            Parent = TabBtn,
+            BackgroundTransparency = 1,
+            Position = UDim2.new(0, tabConfig.Icon and 32 or 10, 0, 0),
+            Size = UDim2.new(1, tabConfig.Icon and -42 or -20, 1, 0),
+            Font = Enum.Font.GothamBold,
+            Text = tabConfig.Name,
+            TextColor3 = Theme.Text,
+            TextSize = 12,
+            TextXAlignment = Enum.TextXAlignment.Left
+        })
+        
+        local TabContent = Create("ScrollingFrame", {
+            Name = tabConfig.Name .. "_Content",
+            Parent = Window.ContentContainer,
+            BackgroundTransparency = 1,
+            Size = UDim2.new(1, 0, 1, 0),
+            ScrollBarThickness = 3,
+            ScrollBarImageColor3 = Theme.Accent,
+            AutomaticCanvasSize = Enum.AutomaticSize.Y,
+            CanvasSize = UDim2.new(0, 0, 0, 0),
+            Visible = false
+        })
+        
+        Create("UIListLayout", {
+            Parent = TabContent,
+            SortOrder = Enum.SortOrder.LayoutOrder,
+            Padding = UDim.new(0, 6)
+        })
+        
+        Create("UIPadding", {
+            Parent = TabContent,
+            PaddingLeft = UDim.new(0, 10),
+            PaddingRight = UDim.new(0, 10),
+            PaddingTop = UDim.new(0, 8),
+            PaddingBottom = UDim.new(0, 8)
+        })
+        
+        Tab.Button = TabBtn
+        Tab.Content = TabContent
+        
+        local function SelectTab()
+            for _, tab in pairs(Window.Tabs) do
+                tab.Content.Visible = false
+                Tween(tab.Button, {BackgroundColor3 = Theme.Tab}, 0.2)
+            end
+            
+            TabContent.Visible = true
+            Tween(TabBtn, {BackgroundColor3 = Theme.TabActive}, 0.2)
+            Window.CurrentTab = Tab
+        end
+        
+        TabBtn.MouseButton1Click:Connect(SelectTab)
+        
+        TabBtn.MouseEnter:Connect(function()
+            if Window.CurrentTab ~= Tab then
+                Tween(TabBtn, {BackgroundColor3 = Theme.ElementHover}, 0.15)
+            end
+        end)
+        
+        TabBtn.MouseLeave:Connect(function()
+            if Window.CurrentTab ~= Tab then
+                Tween(TabBtn, {BackgroundColor3 = Theme.Tab}, 0.15)
+            end
+        end)
+        
+        table.insert(Window.Tabs, Tab)
+        
+        if #Window.Tabs == 1 then
+            SelectTab()
+        end
+        
+        --[[
+            SECTION
+        ]]
+        function Tab:CreateSection(name)
+            local Section = Create("Frame", {
+                Parent = TabContent,
+                BackgroundTransparency = 1,
+                Size = UDim2.new(1, 0, 0, 25)
+            })
+            
+            Create("TextLabel", {
+                Parent = Section,
+                BackgroundTransparency = 1,
+                Size = UDim2.new(1, 0, 1, 0),
+                Font = Enum.Font.GothamBold,
+                Text = name,
+                TextColor3 = Theme.SubText,
+                TextSize = 11,
+                TextXAlignment = Enum.TextXAlignment.Left
+            })
+            
+            Create("Frame", {
+                Parent = Section,
+                BackgroundColor3 = Theme.SubText,
+                BackgroundTransparency = 0.7,
+                Position = UDim2.new(0, 0, 1, -1),
+                Size = UDim2.new(1, 0, 0, 1)
+            })
+        end
+        
+        --[[
+            BUTTON
+        ]]
+        function Tab:CreateButton(config)
+            config = config or {}
+            
+            local btnConfig = {
+                Name = config.Name or "Button",
+                Description = config.Description or nil,
+                Callback = config.Callback or function() end
+            }
+            
+            local hasDesc = btnConfig.Description ~= nil
+            local height = hasDesc and 50 or 36
+            
+            local Button = Create("TextButton", {
+                Parent = TabContent,
+                BackgroundColor3 = Theme.Element,
+                Size = UDim2.new(1, 0, 0, height),
+                Text = "",
+                AutoButtonColor = false
+            })
+            Corner(Button, 6)
+            
+            Create("TextLabel", {
+                Parent = Button,
+                BackgroundTransparency = 1,
+                Position = UDim2.new(0, 12, 0, hasDesc and 6 or 0),
+                Size = UDim2.new(1, -50, 0, hasDesc and 18 or height),
+                Font = Enum.Font.GothamBold,
+                Text = btnConfig.Name,
+                TextColor3 = Theme.Text,
+                TextSize = 13,
+                TextXAlignment = Enum.TextXAlignment.Left
+            })
+            
+            if hasDesc then
+                Create("TextLabel", {
+                    Parent = Button,
+                    BackgroundTransparency = 1,
+                    Position = UDim2.new(0, 12, 0, 24),
+                    Size = UDim2.new(1, -50, 0, 18),
+                    Font = Enum.Font.Gotham,
+                    Text = btnConfig.Description,
+                    TextColor3 = Theme.SubText,
+                    TextSize = 11,
+                    TextXAlignment = Enum.TextXAlignment.Left
+                })
+            end
+            
+            Create("TextLabel", {
+                Parent = Button,
+                BackgroundTransparency = 1,
+                Position = UDim2.new(1, -35, 0, 0),
+                Size = UDim2.new(0, 25, 1, 0),
+                Font = Enum.Font.GothamBold,
+                Text = "→",
+                TextColor3 = Theme.Accent,
+                TextSize = 16
+            })
+            
+            Button.MouseEnter:Connect(function()
+                Tween(Button, {BackgroundColor3 = Theme.ElementHover}, 0.15)
+            end)
+            
+            Button.MouseLeave:Connect(function()
+                Tween(Button, {BackgroundColor3 = Theme.Element}, 0.15)
+            end)
+            
+            Button.MouseButton1Click:Connect(function()
+                local ripple = Create("Frame", {
+                    Parent = Button,
+                    BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                    BackgroundTransparency = 0.8,
+                    Position = UDim2.new(0.5, 0, 0.5, 0),
+                    Size = UDim2.new(0, 0, 0, 0),
+                    AnchorPoint = Vector2.new(0.5, 0.5)
+                })
+                Corner(ripple, 100)
+                
+                Tween(ripple, {Size = UDim2.new(2, 0, 2, 0), BackgroundTransparency = 1}, 0.4)
+                task.delay(0.4, function() ripple:Destroy() end)
+                
+                btnConfig.Callback()
+            end)
+            
+            local ButtonAPI = {}
+            function ButtonAPI:SetText(text)
+                Button:FindFirstChildOfClass("TextLabel").Text = text
+            end
+            return ButtonAPI
+        end
+        
+        --[[
+            TOGGLE
+        ]]
+        function Tab:CreateToggle(config)
+            config = config or {}
+            
+            local toggleConfig = {
+                Name = config.Name or "Toggle",
+                Description = config.Description or nil,
+                CurrentValue = config.CurrentValue or false,
+                Callback = config.Callback or function() end
+            }
+            
+            local Enabled = toggleConfig.CurrentValue
+            local hasDesc = toggleConfig.Description ~= nil
+            local height = hasDesc and 50 or 36
+            
+            local Toggle = Create("TextButton", {
+                Parent = TabContent,
+                BackgroundColor3 = Theme.Element,
+                Size = UDim2.new(1, 0, 0, height),
+                Text = "",
+                AutoButtonColor = false
+            })
+            Corner(Toggle, 6)
+            
+            Create("TextLabel", {
+                Parent = Toggle,
+                BackgroundTransparency = 1,
+                Position = UDim2.new(0, 12, 0, hasDesc and 6 or 0),
+                Size = UDim2.new(1, -70, 0, hasDesc and 18 or height),
+                Font = Enum.Font.GothamBold,
+                Text = toggleConfig.Name,
+                TextColor3 = Theme.Text,
+                TextSize = 13,
+                TextXAlignment = Enum.TextXAlignment.Left
+            })
+            
+            if hasDesc then
+                Create("TextLabel", {
+                    Parent = Toggle,
+                    BackgroundTransparency = 1,
+                    Position = UDim2.new(0, 12, 0, 24),
+                    Size = UDim2.new(1, -70, 0, 18),
+                    Font = Enum.Font.Gotham,
+                    Text = toggleConfig.Description,
+                    TextColor3 = Theme.SubText,
+                    TextSize = 11,
+                    TextXAlignment = Enum.TextXAlignment.Left
+                })
+            end
+            
+            local Indicator = Create("Frame", {
+                Parent = Toggle,
+                BackgroundColor3 = Enabled and Theme.ToggleEnabled or Theme.Toggle,
+                Position = UDim2.new(1, -52, 0.5, -10),
+                Size = UDim2.new(0, 40, 0, 20)
+            })
+            Corner(Indicator, 10)
+            
+            local Circle = Create("Frame", {
+                Parent = Indicator,
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                Position = Enabled and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8),
+                Size = UDim2.new(0, 16, 0, 16)
+            })
+            Corner(Circle, 8)
+            
+            local function UpdateToggle()
+                if Enabled then
+                    Tween(Indicator, {BackgroundColor3 = Theme.ToggleEnabled}, 0.2)
+                    Tween(Circle, {Position = UDim2.new(1, -18, 0.5, -8)}, 0.2)
+                else
+                    Tween(Indicator, {BackgroundColor3 = Theme.Toggle}, 0.2)
+                    Tween(Circle, {Position = UDim2.new(0, 2, 0.5, -8)}, 0.2)
+                end
+            end
+            
+            Toggle.MouseButton1Click:Connect(function()
+                Enabled = not Enabled
+                UpdateToggle()
+                toggleConfig.Callback(Enabled)
+            end)
+            
+            Toggle.MouseEnter:Connect(function()
+                Tween(Toggle, {BackgroundColor3 = Theme.ElementHover}, 0.15)
+            end)
+            
+            Toggle.MouseLeave:Connect(function()
+                Tween(Toggle, {BackgroundColor3 = Theme.Element}, 0.15)
+            end)
+            
+            local ToggleAPI = {}
+            function ToggleAPI:Set(value)
+                Enabled = value
+                UpdateToggle()
+                toggleConfig.Callback(Enabled)
+            end
+            function ToggleAPI:Get()
+                return Enabled
+            end
+            return ToggleAPI
+        end
     
     --[[
         КНОПКА ТАБА
