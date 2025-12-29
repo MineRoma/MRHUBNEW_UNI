@@ -1,6 +1,6 @@
 --[[
     MinrLib - UI Library
-    На основе твоего дизайна GUI
+    Roblox Executor UI Library
 ]]
 
 local MinrLib = {}
@@ -259,24 +259,23 @@ function MinrLib:CreateWindow(config)
         ResetOnSpawn = false
     })
     
-    -- Сохраняем начальные позиции
-    local shapkStartY = 0.5
-    local shapkOffsetY = -190
-    local mainOffsetY = 27
+    -- Константы размеров
+    local TOPBAR_HEIGHT = 53
+    local MAIN_HEIGHT = 381
     
-    -- TopBar (shapk)
+    -- TopBar (shapk) - AnchorPoint снизу чтобы main прилегал
     local shapk = Create("Frame", {
         Name = "shapk",
         Parent = MinrGUI,
         BackgroundColor3 = Theme.TopBar,
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.new(0.5, 0, shapkStartY, shapkOffsetY),
-        Size = IsMobile and UDim2.new(0.95, 0, 0, 53) or UDim2.new(0, 547, 0, 53),
+        AnchorPoint = Vector2.new(0.5, 1), -- Привязка снизу
+        Position = UDim2.new(0.5, 0, 0.5, -MAIN_HEIGHT/2), -- Позиция так чтобы низ shapk был над main
+        Size = IsMobile and UDim2.new(0.95, 0, 0, TOPBAR_HEIGHT) or UDim2.new(0, 547, 0, TOPBAR_HEIGHT),
         ClipsDescendants = true
     })
     Corner(shapk, 8)
     
-    Create("UISizeConstraint", {Parent = shapk, MinSize = Vector2.new(350, 53), MaxSize = Vector2.new(700, 53)})
+    Create("UISizeConstraint", {Parent = shapk, MinSize = Vector2.new(350, TOPBAR_HEIGHT), MaxSize = Vector2.new(700, TOPBAR_HEIGHT)})
     
     -- Название GUI
     local textshapk = Create("Frame", {
@@ -328,15 +327,15 @@ function MinrLib:CreateWindow(config)
     })
     Corner(MinBtn, 6)
     
-    -- Main Frame (AnchorPoint сверху для анимации вверх)
+    -- Main Frame - AnchorPoint сверху, позиция точно под shapk
     local main = Create("Frame", {
         Name = "main",
         Parent = MinrGUI,
         BackgroundColor3 = Theme.Main,
         BackgroundTransparency = Theme.MainTransparency,
-        AnchorPoint = Vector2.new(0.5, 0),
-        Position = UDim2.new(0.5, 0, shapkStartY, shapkOffsetY + 53),
-        Size = IsMobile and UDim2.new(0.95, 0, 0, 381) or UDim2.new(0, 547, 0, 381),
+        AnchorPoint = Vector2.new(0.5, 0), -- Привязка сверху
+        Position = UDim2.new(0.5, 0, 0.5, -MAIN_HEIGHT/2), -- Точно под shapk (там где низ shapk)
+        Size = IsMobile and UDim2.new(0.95, 0, 0, MAIN_HEIGHT) or UDim2.new(0, 547, 0, MAIN_HEIGHT),
         ClipsDescendants = true
     })
     Corner(main, 8)
@@ -432,7 +431,7 @@ function MinrLib:CreateWindow(config)
     }
     
     --[[
-        УВЕДОМЛЕНИЯ (объявляем раньше чтобы использовать в кнопках)
+        УВЕДОМЛЕНИЯ
     ]]
     function Window:Notify(config)
         config = config or {}
@@ -533,16 +532,19 @@ function MinrLib:CreateWindow(config)
     end
     
     -- Анимация появления
-    shapk.Position = UDim2.new(0.5, 0, 0.5, -300)
+    local startShapkPos = shapk.Position
+    local startMainPos = main.Position
+    
+    shapk.Position = UDim2.new(0.5, 0, 0, -100)
     main.Size = IsMobile and UDim2.new(0.95, 0, 0, 0) or UDim2.new(0, 547, 0, 0)
     shapk.BackgroundTransparency = 1
     main.BackgroundTransparency = 1
     
     task.spawn(function()
         task.wait(0.1)
-        Tween(shapk, {Position = UDim2.new(0.5, 0, shapkStartY, shapkOffsetY), BackgroundTransparency = 0}, 0.5, Enum.EasingStyle.Back)
+        Tween(shapk, {Position = startShapkPos, BackgroundTransparency = 0}, 0.5, Enum.EasingStyle.Back)
         task.wait(0.2)
-        Tween(main, {Size = IsMobile and UDim2.new(0.95, 0, 0, 381) or UDim2.new(0, 547, 0, 381), BackgroundTransparency = Theme.MainTransparency}, 0.4, Enum.EasingStyle.Back)
+        Tween(main, {Size = IsMobile and UDim2.new(0.95, 0, 0, MAIN_HEIGHT) or UDim2.new(0, 547, 0, MAIN_HEIGHT), BackgroundTransparency = Theme.MainTransparency}, 0.4, Enum.EasingStyle.Back)
         
         task.wait(0.5)
         if not IsMobile then
@@ -555,15 +557,14 @@ function MinrLib:CreateWindow(config)
         end
     end)
     
-    -- Drag
-    local dragging, dragInput, dragStart, startPosTop, startPosMain
+    -- Drag - синхронизированный
+    local dragging, dragInput, dragStart, startPosShapk
     
     shapk.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
-            startPosTop = shapk.Position
-            startPosMain = main.Position
+            startPosShapk = shapk.Position
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
                     dragging = false
@@ -581,21 +582,31 @@ function MinrLib:CreateWindow(config)
     UserInputService.InputChanged:Connect(function(input)
         if input == dragInput and dragging then
             local delta = input.Position - dragStart
-            local newShapkPos = UDim2.new(startPosTop.X.Scale, startPosTop.X.Offset + delta.X, startPosTop.Y.Scale, startPosTop.Y.Offset + delta.Y)
+            -- Новая позиция shapk (низ shapk)
+            local newShapkPos = UDim2.new(
+                startPosShapk.X.Scale, 
+                startPosShapk.X.Offset + delta.X, 
+                startPosShapk.Y.Scale, 
+                startPosShapk.Y.Offset + delta.Y
+            )
             shapk.Position = newShapkPos
-            -- main следует за shapk (позиция под shapk)
-            main.Position = UDim2.new(newShapkPos.X.Scale, newShapkPos.X.Offset, newShapkPos.Y.Scale, newShapkPos.Y.Offset + 53)
+            
+            -- main следует точно: его верх = низ shapk (та же Y позиция, т.к. shapk AnchorPoint снизу, main сверху)
+            main.Position = UDim2.new(
+                newShapkPos.X.Scale, 
+                newShapkPos.X.Offset, 
+                newShapkPos.Y.Scale, 
+                newShapkPos.Y.Offset
+            )
         end
     end)
     
     --[[
         КНОПКА X - СКРЫТИЕ GUI
-        Скрывает всё окно + показывает уведомление как открыть
     ]]
     X.MouseButton1Click:Connect(function()
         Window.Visible = false
         
-        -- Анимация скрытия
         Tween(shapk, {BackgroundTransparency = 1}, 0.3)
         Tween(main, {Size = UDim2.new(main.Size.X.Scale, main.Size.X.Offset, 0, 0)}, 0.3)
         
@@ -607,7 +618,6 @@ function MinrLib:CreateWindow(config)
             MobileBtn.Visible = true
         end
         
-        -- Уведомление как открыть
         if not IsMobile then
             Window:Notify({
                 Title = "GUI Hidden",
@@ -629,20 +639,16 @@ function MinrLib:CreateWindow(config)
     X.MouseLeave:Connect(function() Tween(X, {BackgroundColor3 = Color3.fromRGB(220, 80, 80)}, 0.15) end)
     
     --[[
-        КНОПКА MINIMIZE - СВОРАЧИВАНИЕ ВВЕРХ
-        При нажатии: main сворачивается вверх (Size.Y = 0)
-        Кнопка меняется на +
+        КНОПКА MINIMIZE - СВОРАЧИВАНИЕ
     ]]
     MinBtn.MouseButton1Click:Connect(function()
         Window.Minimized = not Window.Minimized
         
         if Window.Minimized then
-            -- Сворачиваем вверх
             Tween(main, {Size = UDim2.new(main.Size.X.Scale, main.Size.X.Offset, 0, 0)}, 0.3, Enum.EasingStyle.Quart)
             MinBtn.Text = "+"
         else
-            -- Разворачиваем вниз
-            Tween(main, {Size = IsMobile and UDim2.new(0.95, 0, 0, 381) or UDim2.new(0, 547, 0, 381)}, 0.3, Enum.EasingStyle.Quart)
+            Tween(main, {Size = IsMobile and UDim2.new(0.95, 0, 0, MAIN_HEIGHT) or UDim2.new(0, 547, 0, MAIN_HEIGHT)}, 0.3, Enum.EasingStyle.Quart)
             MinBtn.Text = "−"
         end
     end)
@@ -651,7 +657,7 @@ function MinrLib:CreateWindow(config)
     MinBtn.MouseLeave:Connect(function() Tween(MinBtn, {BackgroundColor3 = Color3.fromRGB(220, 180, 80)}, 0.15) end)
     
     --[[
-        TOGGLE KEY - скрывает/показывает всё окно
+        TOGGLE KEY
     ]]
     if not IsMobile then
         UserInputService.InputBegan:Connect(function(input, processed)
@@ -659,20 +665,18 @@ function MinrLib:CreateWindow(config)
                 Window.Visible = not Window.Visible
                 
                 if Window.Visible then
-                    -- Показываем
                     shapk.Visible = true
                     shapk.BackgroundTransparency = 0
                     
                     if not Window.Minimized then
                         main.Visible = true
-                        main.Size = IsMobile and UDim2.new(0.95, 0, 0, 381) or UDim2.new(0, 547, 0, 381)
+                        main.Size = IsMobile and UDim2.new(0.95, 0, 0, MAIN_HEIGHT) or UDim2.new(0, 547, 0, MAIN_HEIGHT)
                     end
                     
                     if MobileBtn then
                         MobileBtn.Visible = false
                     end
                 else
-                    -- Скрываем
                     shapk.Visible = false
                     main.Visible = false
                     
@@ -719,13 +723,12 @@ function MinrLib:CreateWindow(config)
             main.Visible = true
             MobileBtn.Visible = false
             
-            -- Если было свёрнуто - разворачиваем
             if Window.Minimized then
                 Window.Minimized = false
-                main.Size = IsMobile and UDim2.new(0.95, 0, 0, 381) or UDim2.new(0, 547, 0, 381)
+                main.Size = IsMobile and UDim2.new(0.95, 0, 0, MAIN_HEIGHT) or UDim2.new(0, 547, 0, MAIN_HEIGHT)
                 MinBtn.Text = "−"
             else
-                main.Size = IsMobile and UDim2.new(0.95, 0, 0, 381) or UDim2.new(0, 547, 0, 381)
+                main.Size = IsMobile and UDim2.new(0.95, 0, 0, MAIN_HEIGHT) or UDim2.new(0, 547, 0, MAIN_HEIGHT)
             end
         end)
     end
@@ -1060,6 +1063,175 @@ function MinrLib:CreateWindow(config)
             Corner(Label, 6)
             local LabelText = Create("TextLabel", {Parent = Label, BackgroundTransparency = 1, Position = UDim2.new(0, 15, 0, 0), Size = UDim2.new(1, -30, 1, 0), Font = Enum.Font.Gotham, Text = text, TextColor3 = Theme.Text, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left})
             return {Set = function(_, t) LabelText.Text = t end}
+        end
+        
+        -- Keybind
+        function Tab:CreateKeybind(config)
+            config = config or {}
+            local keybindConfig = {
+                Name = config.Name or "Keybind",
+                Description = config.Description,
+                CurrentKeybind = config.CurrentKeybind or Enum.KeyCode.E,
+                Callback = config.Callback or function() end
+            }
+            local CurrentKey = keybindConfig.CurrentKeybind
+            local Listening = false
+            local height = keybindConfig.Description and 55 or 38
+            
+            local Keybind = Create("TextButton", {Parent = TabContent, BackgroundColor3 = Theme.Button, Size = UDim2.new(1, 0, 0, height), Text = "", AutoButtonColor = false})
+            Corner(Keybind, 6)
+            
+            Create("TextLabel", {Parent = Keybind, BackgroundTransparency = 1, Position = UDim2.new(0, 15, 0, keybindConfig.Description and 8 or 0), Size = UDim2.new(1, -100, 0, keybindConfig.Description and 20 or height), Font = Enum.Font.GothamBold, Text = keybindConfig.Name, TextColor3 = Theme.Text, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left})
+            
+            if keybindConfig.Description then
+                Create("TextLabel", {Parent = Keybind, BackgroundTransparency = 1, Position = UDim2.new(0, 15, 0, 28), Size = UDim2.new(1, -100, 0, 20), Font = Enum.Font.Gotham, Text = keybindConfig.Description, TextColor3 = Theme.SubText, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left})
+            end
+            
+            local KeyLabel = Create("TextLabel", {Parent = Keybind, BackgroundColor3 = Theme.Toggle, Position = UDim2.new(1, -85, 0.5, -15), Size = UDim2.new(0, 70, 0, 30), Font = Enum.Font.GothamBold, Text = CurrentKey.Name, TextColor3 = Theme.Text, TextSize = 12})
+            Corner(KeyLabel, 4)
+            
+            Keybind.MouseButton1Click:Connect(function()
+                Listening = true
+                KeyLabel.Text = "..."
+            end)
+            
+            UserInputService.InputBegan:Connect(function(input, processed)
+                if Listening and input.UserInputType == Enum.UserInputType.Keyboard then
+                    CurrentKey = input.KeyCode
+                    KeyLabel.Text = CurrentKey.Name
+                    Listening = false
+                elseif not processed and input.KeyCode == CurrentKey then
+                    keybindConfig.Callback(CurrentKey)
+                end
+            end)
+            
+            Keybind.MouseEnter:Connect(function() Tween(Keybind, {BackgroundColor3 = Theme.ButtonHover}, 0.15) end)
+            Keybind.MouseLeave:Connect(function() Tween(Keybind, {BackgroundColor3 = Theme.Button}, 0.15) end)
+            
+            return {Set = function(_, key) CurrentKey = key KeyLabel.Text = key.Name end, Get = function() return CurrentKey end}
+        end
+        
+        -- ColorPicker
+        function Tab:CreateColorPicker(config)
+            config = config or {}
+            local colorConfig = {
+                Name = config.Name or "Color Picker",
+                Description = config.Description,
+                Color = config.Color or Color3.fromRGB(255, 255, 255),
+                Callback = config.Callback or function() end
+            }
+            local CurrentColor = colorConfig.Color
+            local Opened = false
+            local baseHeight = colorConfig.Description and 55 or 38
+            
+            local ColorPicker = Create("Frame", {Parent = TabContent, BackgroundColor3 = Theme.Button, Size = UDim2.new(1, 0, 0, baseHeight), ClipsDescendants = true})
+            Corner(ColorPicker, 6)
+            
+            local PickerBtn = Create("TextButton", {Parent = ColorPicker, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, baseHeight), Text = ""})
+            
+            Create("TextLabel", {Parent = PickerBtn, BackgroundTransparency = 1, Position = UDim2.new(0, 15, 0, colorConfig.Description and 8 or 0), Size = UDim2.new(1, -80, 0, colorConfig.Description and 20 or baseHeight), Font = Enum.Font.GothamBold, Text = colorConfig.Name, TextColor3 = Theme.Text, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left})
+            
+            if colorConfig.Description then
+                Create("TextLabel", {Parent = PickerBtn, BackgroundTransparency = 1, Position = UDim2.new(0, 15, 0, 28), Size = UDim2.new(1, -80, 0, 20), Font = Enum.Font.Gotham, Text = colorConfig.Description, TextColor3 = Theme.SubText, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left})
+            end
+            
+            local ColorPreview = Create("Frame", {Parent = PickerBtn, BackgroundColor3 = CurrentColor, Position = UDim2.new(1, -55, 0.5, -15), Size = UDim2.new(0, 40, 0, 30)})
+            Corner(ColorPreview, 4)
+            
+            -- Color picker panel
+            local PickerPanel = Create("Frame", {Parent = ColorPicker, BackgroundTransparency = 1, Position = UDim2.new(0, 10, 0, baseHeight + 5), Size = UDim2.new(1, -20, 0, 120)})
+            
+            -- Hue slider
+            local HueBar = Create("Frame", {Parent = PickerPanel, BackgroundColor3 = Color3.fromRGB(255, 255, 255), Position = UDim2.new(0, 0, 0, 100), Size = UDim2.new(1, 0, 0, 15)})
+            Corner(HueBar, 4)
+            
+            local HueGradient = Create("UIGradient", {Parent = HueBar, Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+                ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 255, 0)),
+                ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)),
+                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)),
+                ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 0, 255)),
+                ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
+            })})
+            
+            local HueSlider = Create("Frame", {Parent = HueBar, BackgroundColor3 = Color3.fromRGB(255, 255, 255), Position = UDim2.new(0, 0, 0.5, -8), Size = UDim2.new(0, 4, 0, 16)})
+            Corner(HueSlider, 2)
+            Stroke(HueSlider, Color3.fromRGB(0, 0, 0), 1)
+            
+            -- Saturation/Value box
+            local SVBox = Create("Frame", {Parent = PickerPanel, BackgroundColor3 = Color3.fromRGB(255, 0, 0), Size = UDim2.new(1, 0, 0, 90)})
+            Corner(SVBox, 4)
+            
+            local SatGradient = Create("UIGradient", {Parent = SVBox, Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(255, 255, 255)), Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1)})})
+            
+            local ValOverlay = Create("Frame", {Parent = SVBox, BackgroundColor3 = Color3.fromRGB(0, 0, 0), Size = UDim2.new(1, 0, 1, 0)})
+            Corner(ValOverlay, 4)
+            local ValGradient = Create("UIGradient", {Parent = ValOverlay, Color = ColorSequence.new(Color3.fromRGB(0, 0, 0), Color3.fromRGB(0, 0, 0)), Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0)}), Rotation = 90})
+            
+            local SVCursor = Create("Frame", {Parent = SVBox, BackgroundColor3 = Color3.fromRGB(255, 255, 255), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.new(0, 10, 0, 10)})
+            Corner(SVCursor, 5)
+            Stroke(SVCursor, Color3.fromRGB(0, 0, 0), 1)
+            
+            local H, S, V = 0, 1, 1
+            
+            local function UpdateColor()
+                CurrentColor = Color3.fromHSV(H, S, V)
+                ColorPreview.BackgroundColor3 = CurrentColor
+                SVBox.BackgroundColor3 = Color3.fromHSV(H, 1, 1)
+                colorConfig.Callback(CurrentColor)
+            end
+            
+            local svDragging = false
+            local hueDragging = false
+            
+            local SVBtn = Create("TextButton", {Parent = SVBox, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), Text = ""})
+            local HueBtn = Create("TextButton", {Parent = HueBar, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), Text = ""})
+            
+            SVBtn.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    svDragging = true
+                end
+            end)
+            SVBtn.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    svDragging = false
+                end
+            end)
+            
+            HueBtn.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    hueDragging = true
+                end
+            end)
+            HueBtn.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    hueDragging = false
+                end
+            end)
+            
+            UserInputService.InputChanged:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                    if svDragging then
+                        S = math.clamp((input.Position.X - SVBox.AbsolutePosition.X) / SVBox.AbsoluteSize.X, 0, 1)
+                        V = 1 - math.clamp((input.Position.Y - SVBox.AbsolutePosition.Y) / SVBox.AbsoluteSize.Y, 0, 1)
+                        SVCursor.Position = UDim2.new(S, 0, 1 - V, 0)
+                        UpdateColor()
+                    elseif hueDragging then
+                        H = math.clamp((input.Position.X - HueBar.AbsolutePosition.X) / HueBar.AbsoluteSize.X, 0, 1)
+                        HueSlider.Position = UDim2.new(H, -2, 0.5, -8)
+                        UpdateColor()
+                    end
+                end
+            end)
+            
+            PickerBtn.MouseButton1Click:Connect(function()
+                Opened = not Opened
+                local h = Opened and (baseHeight + 130) or baseHeight
+                Tween(ColorPicker, {Size = UDim2.new(1, 0, 0, h)}, 0.25)
+            end)
+            
+            return {Set = function(_, c) CurrentColor = c H, S, V = c:ToHSV() ColorPreview.BackgroundColor3 = c SVBox.BackgroundColor3 = Color3.fromHSV(H, 1, 1) SVCursor.Position = UDim2.new(S, 0, 1 - V, 0) HueSlider.Position = UDim2.new(H, -2, 0.5, -8) colorConfig.Callback(c) end, Get = function() return CurrentColor end}
         end
         
         return Tab
