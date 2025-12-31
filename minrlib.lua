@@ -98,6 +98,65 @@ MinrLib.Themes = {
         SubText = Color3.fromRGB(200, 180, 220),
         Alert = Color3.fromRGB(40, 30, 60),
         AlertHeader = Color3.fromRGB(35, 25, 55)
+    },
+        -- НОВАЯ ТЕМА ДЛЯ SHOOTER СКРИПТА
+    Shooter = {
+        Main = Color3.fromRGB(15, 15, 20),
+        MainTransparency = 0.05,
+        TopBar = Color3.fromRGB(20, 20, 28),
+        TabBar = Color3.fromRGB(18, 18, 25),
+        Tab = Color3.fromRGB(30, 30, 40),
+        TabActive = Color3.fromRGB(138, 43, 226), -- Purple accent
+        Button = Color3.fromRGB(35, 35, 45),
+        ButtonHover = Color3.fromRGB(45, 45, 58),
+        CloseBtn = Color3.fromRGB(40, 40, 50),
+        Toggle = Color3.fromRGB(40, 40, 50),
+        ToggleEnabled = Color3.fromRGB(138, 43, 226), -- Purple
+        Accent = Color3.fromRGB(138, 43, 226), -- Purple
+        Text = Color3.fromRGB(255, 255, 255),
+        SubText = Color3.fromRGB(160, 160, 175),
+        Alert = Color3.fromRGB(20, 20, 28),
+        AlertHeader = Color3.fromRGB(15, 15, 22)
+    },
+    
+    -- Красная тема (агрессивная)
+    Red = {
+        Main = Color3.fromRGB(20, 12, 12),
+        MainTransparency = 0.05,
+        TopBar = Color3.fromRGB(28, 15, 15),
+        TabBar = Color3.fromRGB(25, 13, 13),
+        Tab = Color3.fromRGB(40, 25, 25),
+        TabActive = Color3.fromRGB(200, 50, 50),
+        Button = Color3.fromRGB(45, 28, 28),
+        ButtonHover = Color3.fromRGB(58, 35, 35),
+        CloseBtn = Color3.fromRGB(50, 30, 30),
+        Toggle = Color3.fromRGB(50, 30, 30),
+        ToggleEnabled = Color3.fromRGB(200, 50, 50),
+        Accent = Color3.fromRGB(200, 50, 50),
+        Text = Color3.fromRGB(255, 255, 255),
+        SubText = Color3.fromRGB(180, 160, 160),
+        Alert = Color3.fromRGB(28, 15, 15),
+        AlertHeader = Color3.fromRGB(22, 12, 12)
+    },
+    
+    -- Зелёная тема (Matrix style)
+    Matrix = {
+        Main = Color3.fromRGB(8, 18, 12),
+        MainTransparency = 0.05,
+        TopBar = Color3.fromRGB(10, 25, 15),
+        TabBar = Color3.fromRGB(9, 22, 13),
+        Tab = Color3.fromRGB(15, 35, 22),
+        TabActive = Color3.fromRGB(0, 200, 80),
+        Button = Color3.fromRGB(18, 42, 28),
+        ButtonHover = Color3.fromRGB(25, 55, 35),
+        CloseBtn = Color3.fromRGB(20, 45, 30),
+        Toggle = Color3.fromRGB(20, 45, 30),
+        ToggleEnabled = Color3.fromRGB(0, 200, 80),
+        Accent = Color3.fromRGB(0, 200, 80),
+        Text = Color3.fromRGB(220, 255, 230),
+        SubText = Color3.fromRGB(140, 200, 160),
+        Alert = Color3.fromRGB(10, 25, 15),
+        AlertHeader = Color3.fromRGB(8, 20, 12)
     }
 }
 
